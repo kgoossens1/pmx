@@ -28,6 +28,7 @@
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // ----------------------------------------------------------------------
 #include <pmx.h>
+#include <stdio.h>
 
 static PyMethodDef pmx_methods[]={
   {(char *) "dist",wrap_dist, METH_VARARGS, NULL},
@@ -61,8 +62,52 @@ static PyMethodDef pmx_methods[]={
   {NULL,NULL,0,NULL}
 };
 
-void init_pmx(void)
+#if PY_MAJOR_VERSION >= 3
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "_pmx",
+        "pmx C extension",
+        -1,
+        pmx_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    };
+#endif
+
+
+static PyObject *
+moduleinit(void)
 {
-  (void) Py_InitModule3("_pmx",pmx_methods,NULL);
+    PyObject *m;
+
+    #if PY_MAJOR_VERSION >= 3
+        m = PyModule_Create(&moduledef);
+    #else
+        m = Py_InitModule3("_pmx",pmx_methods,NULL);
+    #endif
+
+//    if (PyModule_AddObject(m, "hookable", (PyObject *)&hookabletype) < 0)
+//        return NULL;
+
+    return m;
 }
+
+
+#if PY_MAJOR_VERSION < 3
+    PyMODINIT_FUNC
+    init_pmx(void)
+    {
+        moduleinit();
+    }
+#else
+    PyMODINIT_FUNC
+    PyInit__pmx(void)
+    {
+        return moduleinit();
+    }
+#endif
+
+
 

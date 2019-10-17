@@ -1,14 +1,15 @@
+from __future__ import print_function
 from pmx import *
 from pmx.rotamer import *
 
 c = Chain().create("ALARYTK")
-print 'done'
+print("done")
 c.add_nterm_cap()
 c.add_cterm_cap()
 
 c.rename_atoms()
-print c.sequence()
-c.write('x.pdb')
+print(c.sequence())
+c.write("x.pdb")
 ## bbdep = load_bbdep()
 
 ## res = c.residues[3]
@@ -18,8 +19,6 @@ c.write('x.pdb')
 
 ## rot = get_rotamers( bbdep, "ARG", phi, psi)
 
-## for i, r in enumerate(rot):
+# for i, r in enumerate(rot):
 ##     res.set_conformation( r )
 ##     c.write("rot%d.pdb" % i )
-    
-

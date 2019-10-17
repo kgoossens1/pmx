@@ -37,12 +37,5 @@ class Trajectory(xdrfile.XDRFile):
     def __init__(self, filename, **kwargs):
         xdrfile.XDRFile.__init__(self, filename, **kwargs)
 
-
     def get_natoms(self):
         return self.natoms
-
-
-
-
-
-

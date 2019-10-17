@@ -1,23 +1,23 @@
-import sys, os
+from __future__ import print_function
+import sys
+import os
 from pmx import *
 from pmx.ndx import *
 
-m = Model( "gmx.pdb" )
+m = Model("gmx.pdb")
 
 ndx = IndexFile("index.ndx")
 
-print ndx
-print ndx['Backbone']
+print(ndx)
+print(ndx["Backbone"])
 
-atoms = ndx['Backbone'].select_atoms( m )
-del ndx['Backbone']
-grp = IndexGroup( "Backbone", atoms = atoms )
+atoms = ndx["Backbone"].select_atoms(m)
+del ndx["Backbone"]
+grp = IndexGroup("Backbone", atoms=atoms)
 
-ndx.add_group( grp )
+ndx.add_group(grp)
 
 
-
-print ndx
-#for atom in atoms:
+print(ndx)
+# for atom in atoms:
 #    print atom
-

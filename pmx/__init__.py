@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 # pmx  Copyright Notice
 # ============================
 #
@@ -27,7 +29,7 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ----------------------------------------------------------------------
-__doc__="""
+__doc__ = """
 pmx is a collection of classes and functions to deal with
 molecular structure files. It makes use of some functions
 from the GROMACS molecular dynamics package to read and write
@@ -39,17 +41,18 @@ functionality. Take a look at the example scripts.
 """
 
 from ._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions
 
 import os
-from atom import *
-from molecule import *
-from chain import *
-from model import *
-from options import *
+from .atom import *
+from .molecule import *
+from .chain import *
+from .model import *
+from .options import *
 
 
-XX       =  0
-YY       =  1
-ZZ       =  2
+XX = 0
+YY = 1
+ZZ = 2

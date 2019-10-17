@@ -1,4 +1,7 @@
 from __future__ import print_function, division
+from builtins import zip
+from builtins import range
+from builtins import object
 import numpy as np
 import sys
 from scipy.optimize import fmin
@@ -7,11 +10,11 @@ import scipy.stats
 from copy import deepcopy
 
 # Constants
-kb = 0.00831447215   # kJ/(K*mol)
+kb = 0.00831447215  # kJ/(K*mol)
 
 
 class Jarz(object):
-    '''Jarzynski estimator.
+    """Jarzynski estimator.
 
     Description...
 
@@ -32,71 +35,73 @@ class Jarz(object):
     Attributes
     ----------
 
-    '''
+    """
 
-    def __init__(self, wf, wr, T, nboots=0, nblocks=1, statesProvided='AB'):
-        if 'A' in statesProvided:
+    def __init__(self, wf, wr, T, nboots=0, nblocks=1, statesProvided="AB"):
+        if "A" in statesProvided:
             self.wf = np.array(wf)
-        if 'B' in statesProvided:
+        if "B" in statesProvided:
             self.wr = np.array(wr)
         self.T = float(T)
         self.nboots = nboots
         self.nblocks = nblocks
 
         # Calculate all Jarz properties available
-        if 'A' in statesProvided:
+        if "A" in statesProvided:
             self.dg_for = self.calc_dg(w=self.wf, c=1.0, T=self.T)
-        if 'B' in statesProvided:
+        if "B" in statesProvided:
             self.dg_rev = -1.0 * self.calc_dg(w=self.wr, c=-1.0, T=self.T)
-        if 'AB' in statesProvided:
+        if "AB" in statesProvided:
             self.dg_mean = (self.dg_for + self.dg_rev) * 0.5
 
         if nboots > 0:
-            if 'A' in statesProvided:
-                self.err_boot_for = self.calc_err_boot(w=self.wf, T=self.T,
-                                                   c=1.0, nboots=nboots)
-            if 'B' in statesProvided:
-                self.err_boot_rev = self.calc_err_boot(w=self.wr, T=self.T,
-                                                   c=-1.0, nboots=nboots)
+            if "A" in statesProvided:
+                self.err_boot_for = self.calc_err_boot(
+                    w=self.wf, T=self.T, c=1.0, nboots=nboots
+                )
+            if "B" in statesProvided:
+                self.err_boot_rev = self.calc_err_boot(
+                    w=self.wr, T=self.T, c=-1.0, nboots=nboots
+                )
 
         if nblocks > 1:
-            if 'A' in statesProvided:
-                self.err_blocks_for = self.calc_err_blocks(w=self.wf, c=1.0,
-                                                       T=self.T,
-                                                       nblocks=nblocks)
-            if 'B' in statesProvided:
-                self.err_blocks_rev = self.calc_err_blocks(w=self.wr, c=-1.0,
-                                                       T=self.T,
-                                                       nblocks=nblocks)
+            if "A" in statesProvided:
+                self.err_blocks_for = self.calc_err_blocks(
+                    w=self.wf, c=1.0, T=self.T, nblocks=nblocks
+                )
+            if "B" in statesProvided:
+                self.err_blocks_rev = self.calc_err_blocks(
+                    w=self.wr, c=-1.0, T=self.T, nblocks=nblocks
+                )
 
     @staticmethod
     def calc_dg(w, T, c):
-        '''to be filled
-        '''
-        beta = 1./(kb*T)
+        """to be filled
+        """
+        beta = 1.0 / (kb * T)
         n = float(len(w))
         mexp = 0.0
         m = 0.0
         m2 = 0.0
         for i in w:
-            mexp = mexp + np.exp(-beta*c*i)
-            m = m + c*i
-            m2 = m2 + i*i
-        mexp = mexp/n
-        m = m/n
-        m2 = m2/n
-        var = (m2-m*m)*(n/(n-1))
+            mexp = mexp + np.exp(-beta * c * i)
+            m = m + c * i
+            m2 = m2 + i * i
+        mexp = mexp / n
+        m = m / n
+        m2 = m2 / n
+        var = (m2 - m * m) * (n / (n - 1))
         # Jarzynski estimator
-        dg = -kb*T*np.log(mexp)
+        dg = -kb * T * np.log(mexp)
         # Fluctuation-Dissipation estimator
         # FIXME: unused atm, remove or return?
-        dg2 = m - beta*var/2.0
+        dg2 = m - beta * var / 2.0
 
         return dg
 
     @staticmethod
     def calc_err_boot(w, T, c, nboots):
-        '''Calculates the standard error via bootstrap. The work values are
+        """Calculates the standard error via bootstrap. The work values are
         resampled randomly with replacement multiple (nboots) times,
         and the Jarzinski free energy recalculated for each bootstrap samples.
         The standard error of the estimate is returned as the standard d
@@ -117,24 +122,25 @@ class Jarz(object):
         -------
         err : float
             standard error of the mean.
-        '''
+        """
         dg_boots = []
         n = len(w)
         for k in range(nboots):
-            sys.stdout.write('\r  Bootstrap (Std Err): iteration %s/%s'
-                             % (k+1, nboots))
+            sys.stdout.write(
+                "\r  Bootstrap (Std Err): iteration %s/%s" % (k + 1, nboots)
+            )
             sys.stdout.flush()
 
             boot = np.random.choice(w, size=n, replace=True)
             dg_boot = -1.0 * Jarz.calc_dg(boot, T, c)
             dg_boots.append(dg_boot)
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         err = np.std(dg_boots)
         return err
 
     @staticmethod
     def calc_err_blocks(w, T, c, nblocks):
-        '''Calculates the standard error based on a number of blocks the
+        """Calculates the standard error based on a number of blocks the
         work values are divided into. It is useful when you run independent
         equilibrium simulations, so that you can then use their respective
         work values to compute the standard error based on the repeats.
@@ -151,7 +157,7 @@ class Jarz(object):
             number of blocks to divide the data into. This can be for
             instance the number of independent equilibrium simulations
             you ran.
-        '''
+        """
 
         dg_blocks = []
         # loosely split the arrays
@@ -168,8 +174,8 @@ class Jarz(object):
         return err_blocks
 
 
-class JarzGauss:
-    '''Jarzynski estimator using a Gaussian approximation. [6]_
+class JarzGauss(object):
+    """Jarzynski estimator using a Gaussian approximation. [6]_
     Both the forward and reverse estimates.
     The standard error is calculated using the analytical expression derived
     by Hummer (2001). [6]_ When ``nboots``>0, the error is also calculated
@@ -223,50 +229,48 @@ class JarzGauss:
     err_blocks_rev : float
         standard error of the reverse free energy estimate calculated by
         separating the input work values into groups/blocks.
-    '''
+    """
 
-    def __init__(self, wf, wr, T=298.15, nboots=0, nblocks=1, statesProvided='AB'):
-        if 'A' in statesProvided:
+    def __init__(self, wf, wr, T=298.15, nboots=0, nblocks=1, statesProvided="AB"):
+        if "A" in statesProvided:
             self.wf = np.array(wf)
-        if 'B' in statesProvided:
+        if "B" in statesProvided:
             self.wr = np.array(wr)
         self.T = float(T)
         self.nboots = nboots
         self.nblocks = nblocks
 
         # Calculate all Jarz properties available
-        if 'A' in statesProvided:
+        if "A" in statesProvided:
             self.dg_for = self.calc_dg(w=self.wf, T=self.T, bReverse=False)
             self.err_for = self.calc_err(w=self.wf, T=self.T, bReverse=False)
-        if 'B' in statesProvided:
+        if "B" in statesProvided:
             self.dg_rev = self.calc_dg(w=self.wr, T=self.T, bReverse=True)
             self.err_rev = self.calc_err(w=self.wr, T=self.T, bReverse=True)
 
         if nboots > 0:
-            if 'A' in statesProvided:
-                self.err_boot_for = self.calc_err_boot(w=self.wf, T=self.T,
-                                                       nboots=self.nboots,
-                                                       bReverse=False)
-            if 'B' in statesProvided:
-                self.err_boot_rev = self.calc_err_boot(w=self.wr, T=self.T,
-                                                       nboots=self.nboots,
-                                                       bReverse=True)
+            if "A" in statesProvided:
+                self.err_boot_for = self.calc_err_boot(
+                    w=self.wf, T=self.T, nboots=self.nboots, bReverse=False
+                )
+            if "B" in statesProvided:
+                self.err_boot_rev = self.calc_err_boot(
+                    w=self.wr, T=self.T, nboots=self.nboots, bReverse=True
+                )
 
         if nblocks > 1:
-            if 'A' in statesProvided:
-                self.err_blocks_for = self.calc_err_blocks(w=self.wf,
-                                                           T=self.T,
-                                                           nblocks=self.nblocks,
-                                                           bReverse=False)
-            if 'B' in statesProvided:
-                self.err_blocks_rev = self.calc_err_blocks(w=self.wr,
-                                                           T=self.T,
-                                                           nblocks=self.nblocks,
-                                                           bReverse=True)
+            if "A" in statesProvided:
+                self.err_blocks_for = self.calc_err_blocks(
+                    w=self.wf, T=self.T, nblocks=self.nblocks, bReverse=False
+                )
+            if "B" in statesProvided:
+                self.err_blocks_rev = self.calc_err_blocks(
+                    w=self.wr, T=self.T, nblocks=self.nblocks, bReverse=True
+                )
 
     @staticmethod
     def calc_dg(w, T, bReverse=False):
-        '''Calculates the free energy difference using the Jarzynski estimator
+        """Calculates the free energy difference using the Jarzynski estimator
         with a Gaussian approximation. [6]_
         Parameters
         ----------
@@ -282,19 +286,19 @@ class JarzGauss:
         -------
         dg : float
             estimate of the free energy difference.
-        '''
-        beta = 1./(kb*T)
+        """
+        beta = 1.0 / (kb * T)
         if bReverse is False:
             c = 1.0
         elif bReverse is True:
             c = -1.0
 
-        dg = np.mean(c*w) - (beta * np.var(c*w, ddof=1)) * 0.5
+        dg = np.mean(c * w) - (beta * np.var(c * w, ddof=1)) * 0.5
         return c * dg
 
     @staticmethod
     def calc_err(w, T, bReverse=False):
-        '''Calculates the standard error via an analytic expression.
+        """Calculates the standard error via an analytic expression.
         The expression is derived by Hummer, 2001, JChemPhys. [6]_
         Parameters
         ----------
@@ -310,19 +314,19 @@ class JarzGauss:
         -------
         err : float
             standard deviation of the estimator.
-        '''
+        """
 
-        beta = 1./(kb*T)
+        beta = 1.0 / (kb * T)
         w_var = np.var(w, ddof=1)
         n = float(len(w))
-        dg_var = w_var/n + np.power(beta*w_var, 2) / (2.0 * (n-1.0))
+        dg_var = w_var / n + np.power(beta * w_var, 2) / (2.0 * (n - 1.0))
         dg_stderr = np.sqrt(dg_var)
 
         return dg_stderr
 
     @staticmethod
     def calc_err_boot(w, T, nboots, bReverse=False):
-        '''Calculates the standard error via bootstrap. The work values are
+        """Calculates the standard error via bootstrap. The work values are
         resampled randomly with replacement multiple (nboots) times,
         and the Gaussian approximation for Jarzinski free energy
         is recalculated for each bootstrap samples.
@@ -344,24 +348,25 @@ class JarzGauss:
         -------
         err : float
             standard error of the mean.
-        '''
+        """
         dg_boots = []
         n = len(w)
         for k in range(nboots):
-            sys.stdout.write('\r  Bootstrap (Std Err): iteration %s/%s'
-                             % (k+1, nboots))
+            sys.stdout.write(
+                "\r  Bootstrap (Std Err): iteration %s/%s" % (k + 1, nboots)
+            )
             sys.stdout.flush()
 
             boot = np.random.choice(w, size=n, replace=True)
             dg_boot = JarzGauss.calc_dg(boot, T, bReverse)
             dg_boots.append(dg_boot)
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         err = np.std(dg_boots)
         return err
 
     @staticmethod
     def calc_err_blocks(w, T, nblocks, bReverse=False):
-        '''Calculates the standard error based on a number of blocks the
+        """Calculates the standard error based on a number of blocks the
         work values are divided into. It is useful when you run independent
         equilibrium simulations, so that you can then use their respective
         work values to compute the standard error based on the repeats.
@@ -383,7 +388,7 @@ class JarzGauss:
         -------
         sderr : float
             the standard error of the estimate.
-        '''
+        """
 
         dg_blocks = []
         # loosely split the arrays
@@ -401,7 +406,7 @@ class JarzGauss:
 
 
 class Crooks(object):
-    '''Crooks Gaussian Intersection (CGI) estimator. The forward and reverse work
+    """Crooks Gaussian Intersection (CGI) estimator. The forward and reverse work
     values are fitted to Gaussian functions and their intersection is taken
     as the free energy estimate. In some cases, when the two Gaussians are very
     close to each other, the intersection cannot be taken and the average of
@@ -442,7 +447,7 @@ class Crooks(object):
         mean of the reverse Gaussian.
     devr : float
         standard deviation of the reverse Gaussian.
-    '''
+    """
 
     def __init__(self, wf, wr, nboots=0, nblocks=1):
 
@@ -458,20 +463,24 @@ class Crooks(object):
         # Calculate Crooks properties
         self.dg, self.inters_bool = self.calc_dg(wf=self.wf, wr=self.wr)
 
-        self.err_boot1 = self.calc_err_boot1(m1=self.mf, s1=self.devf,
-                                             n1=len(wf), m2=self.mr,
-                                             s2=self.devr, n2=len(wr),
-                                             nboots=1000)
+        self.err_boot1 = self.calc_err_boot1(
+            m1=self.mf,
+            s1=self.devf,
+            n1=len(wf),
+            m2=self.mr,
+            s2=self.devr,
+            n2=len(wr),
+            nboots=1000,
+        )
         if nboots > 0:
-            self.err_boot2 = self.calc_err_boot2(wf=self.wf, wr=self.wr,
-                                                 nboots=nboots)
+            self.err_boot2 = self.calc_err_boot2(wf=self.wf, wr=self.wr, nboots=nboots)
 
         if nblocks > 1:
             self.err_blocks = self.calc_err_blocks(self.wf, self.wr, nblocks)
 
     @staticmethod
     def calc_dg(wf, wr):
-        '''Calculates the free energy difference using the Crooks Gaussian
+        """Calculates the free energy difference using the Crooks Gaussian
         Intersection method. It finds the intersection of two Gaussian
         functions. If the intersection cannot be computed, the average of
         the two Gaussian locations is returned.
@@ -493,16 +502,19 @@ class Crooks(object):
             If the Gaussians are too close to each other, the intersection
             cannot be calculated and a False value is returned; in this case,
             the first float value retured is the average of the Gaussian means.
-        '''
+        """
 
         m1, s1, A1 = data2gauss(wf)
         m2, s2, A2 = data2gauss(wr)
 
-        p1 = m1/s1**2-m2/s2**2
-        p2 = np.sqrt(1/(s1**2*s2**2)*(m1-m2)**2+2*(1/s1**2-1/s2**2)*np.log(s2/s1))
-        p3 = 1/s1**2-1/s2**2
-        x1 = (p1+p2)/p3
-        x2 = (p1-p2)/p3
+        p1 = m1 / s1 ** 2 - m2 / s2 ** 2
+        p2 = np.sqrt(
+            1 / (s1 ** 2 * s2 ** 2) * (m1 - m2) ** 2
+            + 2 * (1 / s1 ** 2 - 1 / s2 ** 2) * np.log(s2 / s1)
+        )
+        p3 = 1 / s1 ** 2 - 1 / s2 ** 2
+        x1 = (p1 + p2) / p3
+        x2 = (p1 - p2) / p3
 
         # determine which solution to take
         if x1 > m1 and x1 < m2 or x1 > m2 and x1 < m1:
@@ -522,7 +534,7 @@ class Crooks(object):
     # be taken, then the mean is used automatically.
     @staticmethod
     def calc_err_boot1(m1, s1, n1, m2, s2, n2, nboots=1000):
-        '''Calculates the standard error of the Crooks Gaussian Intersection
+        """Calculates the standard error of the Crooks Gaussian Intersection
         via parametric bootstrap. Given the parameters of the forward and
         reverse Gaussian distributions, multiple (nboots) bootstrap samples
         are built by random sampling from these two Gaussian distributions.
@@ -554,7 +566,7 @@ class Crooks(object):
         -------
         float
             standard error of the mean.
-        '''
+        """
 
         dg_boots = []
         for k in range(nboots):
@@ -568,7 +580,7 @@ class Crooks(object):
 
     @staticmethod
     def calc_err_boot2(wf, wr, nboots):
-        '''Calculates the standard error of the Crooks Gaussian Intersection
+        """Calculates the standard error of the Crooks Gaussian Intersection
         via non-parametric bootstrap. The work values are resampled randomly
         with replacement multiple (nboots) times, and the CGI free energy
         recalculated for each bootstrap samples. The standard error of
@@ -588,15 +600,16 @@ class Crooks(object):
         -------
         err : float
             standard error of the mean.
-        '''
+        """
 
         nf = len(wf)
         nr = len(wr)
 
         dg_boots = []
         for k in range(nboots):
-            sys.stdout.write('\r  Bootstrap (Std Err): iteration %s/%s'
-                             % (k+1, nboots))
+            sys.stdout.write(
+                "\r  Bootstrap (Std Err): iteration %s/%s" % (k + 1, nboots)
+            )
             sys.stdout.flush()
 
             bootA = np.random.choice(wf, size=nf, replace=True)
@@ -605,13 +618,13 @@ class Crooks(object):
             dg_boot, _ = Crooks.calc_dg(bootA, bootB)
             dg_boots.append(dg_boot)
 
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         err = np.std(dg_boots)
         return err
 
     @staticmethod
     def calc_err_blocks(wf, wr, nblocks):
-        '''Calculates the standard error based on a number of blocks the
+        """Calculates the standard error based on a number of blocks the
         work values are divided into. It is useful when you run independent
         equilibrium simulations, so that you can then use their respective
         work values to compute the standard error based on the repeats.
@@ -626,7 +639,7 @@ class Crooks(object):
             number of blocks to divide the data into. This can be for
             instance the number of independent equilibrium simulations
             you ran.
-        '''
+        """
 
         dg_blocks = []
         # loosely split the arrays
@@ -645,7 +658,7 @@ class Crooks(object):
 
 
 class BAR(object):
-    '''Bennett acceptance ratio (BAR).
+    """Bennett acceptance ratio (BAR).
 
     Description...
 
@@ -654,7 +667,7 @@ class BAR(object):
 
     Examples
     --------
-    '''
+    """
 
     def __init__(self, wf, wr, T, nboots=0, nblocks=1):
         self.wf = np.array(wf)
@@ -665,27 +678,25 @@ class BAR(object):
 
         self.nf = len(wf)
         self.nr = len(wr)
-        self.beta = 1./(kb*self.T)
+        self.beta = 1.0 / (kb * self.T)
         self.M = kb * self.T * np.log(float(self.nf) / float(self.nr))
 
         # Calculate all BAR properties available
         self.dg = self.calc_dg(self.wf, self.wr, self.T)
         self.err = self.calc_err(self.dg, self.wf, self.wr, self.T)
         if nboots > 0:
-            self.err_boot = self.calc_err_boot(self.wf, self.wr, nboots,
-                                               self.T)
+            self.err_boot = self.calc_err_boot(self.wf, self.wr, nboots, self.T)
         self.conv = self.calc_conv(self.dg, self.wf, self.wr, self.T)
         if nboots > 0:
-            self.conv_err_boot = self.calc_conv_err_boot(self.dg, self.wf,
-                                                         self.wr, nboots,
-                                                         self.T)
+            self.conv_err_boot = self.calc_conv_err_boot(
+                self.dg, self.wf, self.wr, nboots, self.T
+            )
         if nblocks > 1:
-            self.err_blocks = self.calc_err_blocks(self.wf, self.wr, nblocks,
-                                                   self.T)
+            self.err_blocks = self.calc_err_blocks(self.wf, self.wr, nblocks, self.T)
 
     @staticmethod
     def calc_dg(wf, wr, T):
-        '''Estimates and returns the free energy difference.
+        """Estimates and returns the free energy difference.
 
         Parameters
         ----------
@@ -700,35 +711,35 @@ class BAR(object):
         ----------
         dg : float
             the BAR free energy estimate.
-        '''
+        """
 
         nf = float(len(wf))
         nr = float(len(wr))
-        beta = 1./(kb*T)
-        M = kb * T * np.log(nf/nr)
+        beta = 1.0 / (kb * T)
+        M = kb * T * np.log(nf / nr)
 
         def func(x, wf, wr):
             sf = 0
             for v in wf:
-                sf += 1./(1+np.exp(beta*(M+v-x)))
+                sf += 1.0 / (1 + np.exp(beta * (M + v - x)))
 
             sr = 0
             for v in wr:
-                sr += 1./(1+np.exp(-beta*(M+v-x)))
+                sr += 1.0 / (1 + np.exp(-beta * (M + v - x)))
 
-            r = sf-sr
-            return r**2
+            r = sf - sr
+            return r ** 2
 
         avA = np.average(wf)
         avB = np.average(wr)
-        x0 = (avA+avB)/2.
+        x0 = (avA + avB) / 2.0
         dg = fmin(func, x0=x0, args=(wf, wr), disp=0)
 
         return float(dg)
 
     @staticmethod
     def calc_err(dg, wf, wr, T):
-        '''Calculates the analytical error estimate.
+        """Calculates the analytical error estimate.
 
         Parameters
         ----------
@@ -740,28 +751,28 @@ class BAR(object):
             array of reverse work values.
         T : float
             temperature
-        '''
+        """
 
         nf = float(len(wf))
         nr = float(len(wr))
-        beta = 1./(kb*T)
-        M = kb * T * np.log(nf/nr)
+        beta = 1.0 / (kb * T)
+        M = kb * T * np.log(nf / nr)
 
         err = 0
         for v in wf:
-            err += 1./(2+2*np.cosh(beta * (M+v-dg)))
+            err += 1.0 / (2 + 2 * np.cosh(beta * (M + v - dg)))
         for v in wr:
-            err += 1./(2+2*np.cosh(beta * (M+v-dg)))
+            err += 1.0 / (2 + 2 * np.cosh(beta * (M + v - dg)))
         N = nf + nr
         err /= float(N)
-        tot = 1/(beta**2*N)*(1./err-(N/nf + N/nr))
+        tot = 1 / (beta ** 2 * N) * (1.0 / err - (N / nf + N / nr))
 
         err = float(np.sqrt(tot))
         return err
 
     @staticmethod
     def calc_err_boot(wf, wr, nboots, T):
-        '''Calculates the error by bootstrapping.
+        """Calculates the error by bootstrapping.
 
         Parameters
         ----------
@@ -774,14 +785,15 @@ class BAR(object):
         nboots: int
             number of bootstrap samples.
 
-        '''
+        """
 
         nf = len(wf)
         nr = len(wr)
         dg_boots = []
         for k in range(nboots):
-            sys.stdout.write('\r  Bootstrap (Std Err): iteration %s/%s'
-                             % (k+1, nboots))
+            sys.stdout.write(
+                "\r  Bootstrap (Std Err): iteration %s/%s" % (k + 1, nboots)
+            )
             sys.stdout.flush()
 
             bootA = np.random.choice(wf, size=nf, replace=True)
@@ -789,14 +801,14 @@ class BAR(object):
             dg_boot = BAR.calc_dg(bootA, bootB, T)
             dg_boots.append(dg_boot)
 
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         err_boot = np.std(dg_boots)
 
         return err_boot
 
     @staticmethod
     def calc_err_blocks(wf, wr, nblocks, T):
-        '''Calculates the standard error based on a number of blocks the
+        """Calculates the standard error based on a number of blocks the
         work values are divided into. It is useful when you run independent
         equilibrium simulations, so that you can then use their respective
         work values to compute the standard error based on the repeats.
@@ -813,7 +825,7 @@ class BAR(object):
             number of blocks to divide the data into. This can be for
             instance the number of independent equilibrium simulations
             you ran.
-        '''
+        """
 
         dg_blocks = []
         # loosely split the arrays
@@ -832,7 +844,7 @@ class BAR(object):
 
     @staticmethod
     def calc_conv(dg, wf, wr, T):
-        '''Evaluates BAR convergence as described in Hahn & Then, Phys Rev E
+        """Evaluates BAR convergence as described in Hahn & Then, Phys Rev E
         (2010), 81, 041117. Returns a value between -1 and 1: the closer this
         value to zero the better the BAR convergence.
 
@@ -847,24 +859,25 @@ class BAR(object):
         T : float
             temperature
 
-        '''
+        """
 
         wf = np.array(wf)
         wr = np.array(wr)
 
-        beta = 1./(kb*T)
+        beta = 1.0 / (kb * T)
         nf = len(wf)
         nr = len(wr)
         N = float(nf + nr)
 
-        ratio_alpha = float(nf)/N
-        ratio_beta = float(nr)/N
-        bf = 1.0/(ratio_beta + ratio_alpha * np.exp(beta*(wf-dg)))
-        tf = 1.0/(ratio_alpha + ratio_beta * np.exp(beta*(-wr+dg)))
-        Ua = (np.mean(tf) + np.mean(bf))/2.0
-        Ua2 = (ratio_alpha * np.mean(np.power(tf, 2)) +
-               ratio_beta * np.mean(np.power(bf, 2)))
-        conv = (Ua-Ua2)/Ua
+        ratio_alpha = float(nf) / N
+        ratio_beta = float(nr) / N
+        bf = 1.0 / (ratio_beta + ratio_alpha * np.exp(beta * (wf - dg)))
+        tf = 1.0 / (ratio_alpha + ratio_beta * np.exp(beta * (-wr + dg)))
+        Ua = (np.mean(tf) + np.mean(bf)) / 2.0
+        Ua2 = ratio_alpha * np.mean(np.power(tf, 2)) + ratio_beta * np.mean(
+            np.power(bf, 2)
+        )
+        conv = (Ua - Ua2) / Ua
         return conv
 
     @staticmethod
@@ -873,8 +886,9 @@ class BAR(object):
         nr = len(wr)
         conv_boots = []
         for k in range(nboots):
-            sys.stdout.write('\r  Bootstrap (Conv): '
-                             'iteration %s/%s' % (k+1, nboots))
+            sys.stdout.write(
+                "\r  Bootstrap (Conv): " "iteration %s/%s" % (k + 1, nboots)
+            )
             sys.stdout.flush()
 
             bootA = np.random.choice(wf, size=nf, replace=True)
@@ -882,7 +896,7 @@ class BAR(object):
             conv_boot = BAR.calc_conv(dg, bootA, bootB, T)
             conv_boots.append(conv_boot)
 
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
         err = np.std(conv_boots)
         return err
 
@@ -891,7 +905,7 @@ class BAR(object):
 #                               FUNCTIONS
 # ==============================================================================
 def ks_norm_test(data, alpha=0.05, refks=None):
-    '''Performs a Kolmogorov-Smirnov test of normality.
+    """Performs a Kolmogorov-Smirnov test of normality.
 
     Parameters
     ----------
@@ -909,7 +923,7 @@ def ks_norm_test(data, alpha=0.05, refks=None):
     lam0 : float
     check : float
     bOk : bool
-    '''
+    """
 
     def ksref():
         f = 1
@@ -918,7 +932,7 @@ def ks_norm_test(data, alpha=0.05, refks=None):
         q = np.zeros(len(lamb), float)
         res = []
         for k in range(-potent, potent):
-            q = q + f*np.exp(-2.0*(k**2)*(lamb**2))
+            q = q + f * np.exp(-2.0 * (k ** 2) * (lamb ** 2))
             f = -f
         for i in range(len(lamb)):
             res.append((lamb[i], q[i]))
@@ -929,7 +943,7 @@ def ks_norm_test(data, alpha=0.05, refks=None):
         potent = 10000
         q = 0
         for k in range(-potent, potent):
-            q = q + f*np.exp(-2.0*(k**2)*(lamb**2))
+            q = q + f * np.exp(-2.0 * (k ** 2) * (lamb ** 2))
             f *= -1
         return q
 
@@ -942,7 +956,7 @@ def ks_norm_test(data, alpha=0.05, refks=None):
         cnt = 0
         for item in data:
             cnt += 1
-            edf_.append(cnt/N)
+            edf_.append(cnt / N)
             ndata.append(item)
         ndata = np.array(ndata)
         edf_ = np.array(edf_)
@@ -953,25 +967,25 @@ def ks_norm_test(data, alpha=0.05, refks=None):
         data.sort()
         mean = np.average(data)
         sig = np.std(data)
-        cdf = 0.5*(1+erf((data-mean)/float(sig*np.sqrt(2))))
+        cdf = 0.5 * (1 + erf((data - mean) / float(sig * np.sqrt(2))))
         return cdf
 
     N = len(data)
     nd, ed = edf(data)
     cd = cdf(data)
-    siglev = 1-alpha
+    siglev = 1 - alpha
     dval = []
     for i, val in enumerate(ed):
-        d = abs(val-cd[i])
+        d = abs(val - cd[i])
         dval.append(d)
         if i:
-            d = abs(ed[i-1]-cd[i])
+            d = abs(ed[i - 1] - cd[i])
             dval.append(d)
     dmax = max(dval)
-    check = np.sqrt(N)*dmax
+    check = np.sqrt(N) * dmax
     if not refks:
         refks = ksref()
-    lst = filter(lambda x: x[1] > siglev, refks)
+    lst = [x for x in refks if x[1] > siglev]
     lam0 = lst[0][0]
     if check >= lam0:
         bOk = False
@@ -979,11 +993,11 @@ def ks_norm_test(data, alpha=0.05, refks=None):
         bOk = True
 
     q = ksfunc(check)
-    return (1-q), lam0, check, bOk
+    return (1 - q), lam0, check, bOk
 
 
 def data2gauss(data):
-    '''Takes a one dimensional array and fits a Gaussian.
+    """Takes a one dimensional array and fits a Gaussian.
 
     Returns
     -------
@@ -993,8 +1007,8 @@ def data2gauss(data):
         standard deviation of the distribution.
     float
         height of the curve's peak.
-    '''
+    """
     m = np.average(data)
     dev = np.std(data)
-    A = 1./(dev*np.sqrt(2*np.pi))
+    A = 1.0 / (dev * np.sqrt(2 * np.pi))
     return m, dev, A

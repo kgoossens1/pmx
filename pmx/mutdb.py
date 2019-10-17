@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 # pmx  Copyright Notice
 # ============================
 #
@@ -27,66 +29,69 @@
 # CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 # ----------------------------------------------------------------------
-__doc__="""
+__doc__ = """
 Functions to read the mutation database
 """
-import sys,os
-from model import Model
-from atom import Atom
-from molecule import Molecule
-from parser import *
+import sys, os
+from .model import Model
+from .atom import Atom
+from .molecule import Molecule
+from .parser import *
 
-def read_mutpdb(filename='mutations_oplsaa.pdb'):
-    if not hasattr(filename,"read"):
-        s = open(filename).read().split('ENDMDL')[:-1]
+
+def read_mutpdb(filename="mutations_oplsaa.pdb"):
+    if not hasattr(filename, "read"):
+        s = open(filename).read().split("ENDMDL")[:-1]
     else:
-        s = filename.read().split('ENDMDL')[:-1]
+        s = filename.read().split("ENDMDL")[:-1]
     ml = []
     for entr in s:
-        m = Model(pdbline = entr)
+        m = Model(pdbline=entr)
         ml.append(m)
     rdic = {}
-    for  m in ml:
+    for m in ml:
         r = m.residues[0]
         rdic[r.resname] = r
     return rdic
 
-def read_new_mtp_entry( entry, filename = 'mutres.mtp'):
 
-    if not hasattr(filename,"read"):
+def read_new_mtp_entry(entry, filename="mutres.mtp"):
+
+    if not hasattr(filename, "read"):
         lst = open(filename).readlines()
     else:
         lst = filename.readlines()
-        
-    lst = kickOutComments(lst,';')
-    key = '[ '+entry+' ]'
-    keyw = ('[ morphes ]', '[ atoms ]','[ impropers ]','[ dihedrals ]',\
-            '[ rotations ]','[ coords ]')
+
+    lst = kickOutComments(lst, ";")
+    key = "[ " + entry + " ]"
+    keyw = (
+        "[ morphes ]",
+        "[ atoms ]",
+        "[ impropers ]",
+        "[ dihedrals ]",
+        "[ rotations ]",
+        "[ coords ]",
+    )
     res = []
     for i, line in enumerate(lst):
         if line.startswith(key):
-            for line2 in lst[i+1:]:
-                if line2.startswith('[') and \
-                   line2 not in keyw:
+            for line2 in lst[i + 1 :]:
+                if line2.startswith("[") and line2 not in keyw:
                     break
                 else:
                     res.append(line2)
 
     morphes = {}
-    ml = readSection(res,'[ morphes ]','[')
+    ml = readSection(res, "[ morphes ]", "[")
     for i, line in enumerate(ml):
         entr = line.split()
         n0 = entr[0]
         t0 = entr[1]
         n1 = entr[3]
         t1 = entr[4]
-        morphes[n0] = {
-            't0':t0,
-            'n1':n1,
-            't1':t1,
-            }
-    atoms = [] 
-    al = readSection(res,'[ atoms ]','[')
+        morphes[n0] = {"t0": t0, "n1": n1, "t1": t1}
+    atoms = []
+    al = readSection(res, "[ atoms ]", "[")
     for i, line in enumerate(al):
         entr = line.split()
         name = entr[0]
@@ -97,28 +102,35 @@ def read_new_mtp_entry( entry, filename = 'mutres.mtp'):
         atomtypeB = entr[5]
         qB = float(entr[6])
         mB = float(entr[7])
-        a = Atom(name = name,id=i+1,\
-                 atomtype=atomtype, q = q,\
-                 m=m,cgnr=cgnr,atomtypeB=atomtypeB,\
-                 qB = qB, mB = mB)
+        a = Atom(
+            name=name,
+            id=i + 1,
+            atomtype=atomtype,
+            q=q,
+            m=m,
+            cgnr=cgnr,
+            atomtypeB=atomtypeB,
+            qB=qB,
+            mB=mB,
+        )
         atoms.append(a)
-    mol = Molecule(atoms = atoms, unity = 'nm')
+    mol = Molecule(atoms=atoms, unity="nm")
     mol.set_resname(entry)
 
-    coords = readSection(res,'[ coords ]','[')
-    coords = parseList('fff',coords)
+    coords = readSection(res, "[ coords ]", "[")
+    coords = parseList("fff", coords)
     for i, atom in enumerate(mol.atoms):
         atom.x = coords[i]
-        atom.unity = 'A'
-    il = readSection(res,'[ impropers ]','[')
+        atom.unity = "A"
+    il = readSection(res, "[ impropers ]", "[")
     imps = []
     for line in il:
         imps.append(line.split())
     diheds = []
-    dl = readSection(res,'[ dihedrals ]','[')
+    dl = readSection(res, "[ dihedrals ]", "[")
     for line in dl:
         diheds.append(line.split())
-    rl = readSection(res,'[ rotations ]','[')
+    rl = readSection(res, "[ rotations ]", "[")
     rots = []
     for line in rl:
         rots.append(line.split())
@@ -131,33 +143,37 @@ def read_new_mtp_entry( entry, filename = 'mutres.mtp'):
     bonds = []
     return mol, bonds, imps, diheds, rotdic
 
-    
 
-
-def read_mtp_entry(entry,filename='ffamber99sb.mtp', version = 'old'):
-    if version == 'new':
-        return read_new_mtp_entry( entry, filename = filename )
-    if not hasattr(filename,"read"):
+def read_mtp_entry(entry, filename="ffamber99sb.mtp", version="old"):
+    if version == "new":
+        return read_new_mtp_entry(entry, filename=filename)
+    if not hasattr(filename, "read"):
         lst = open(filename).readlines()
     else:
         lst = filename.readlines()
-        
-    lst = kickOutComments(lst,';')
-    key = '[ '+entry+' ]'
-    keyw = ('[ morphes ]', '[ atoms ]','[ bonds ]','[ impropers ]',\
-            '[ dihedrals ]','[ rotations ]','[ coords ]')
+
+    lst = kickOutComments(lst, ";")
+    key = "[ " + entry + " ]"
+    keyw = (
+        "[ morphes ]",
+        "[ atoms ]",
+        "[ bonds ]",
+        "[ impropers ]",
+        "[ dihedrals ]",
+        "[ rotations ]",
+        "[ coords ]",
+    )
     res = []
     for i, line in enumerate(lst):
         if line.startswith(key):
-            for line2 in lst[i+1:]:
-                if line2.startswith('[') and \
-                   line2 not in keyw:
+            for line2 in lst[i + 1 :]:
+                if line2.startswith("[") and line2 not in keyw:
                     break
                 else:
                     res.append(line2)
 
     morphes = {}
-    ml = readSection(res,'[ morphes ]','[')
+    ml = readSection(res, "[ morphes ]", "[")
     for i, line in enumerate(ml):
         entr = line.split()
         n0 = entr[0]
@@ -166,16 +182,10 @@ def read_mtp_entry(entry,filename='ffamber99sb.mtp', version = 'old'):
         n1 = entr[4]
         r1 = entr[5]
         t1 = entr[6]
-        morphes[n0] = {
-            'r0':r0,
-            't0':t0,
-            'n1':n1,
-            'r1':r1,
-            't1':t1,
-            }
-        
-    atoms = [] 
-    al = readSection(res,'[ atoms ]','[')
+        morphes[n0] = {"r0": r0, "t0": t0, "n1": n1, "r1": r1, "t1": t1}
+
+    atoms = []
+    al = readSection(res, "[ atoms ]", "[")
     for i, line in enumerate(al):
         entr = line.split()
         name = entr[0]
@@ -186,33 +196,40 @@ def read_mtp_entry(entry,filename='ffamber99sb.mtp', version = 'old'):
         atomtypeB = entr[5]
         qB = float(entr[6])
         mB = float(entr[7])
-        a = Atom(name = name,id=i+1,\
-                 atomtype=atomtype, q = q,\
-                 m=m,cgnr=cgnr,atomtypeB=atomtypeB,\
-                 qB = qB, mB = mB)
+        a = Atom(
+            name=name,
+            id=i + 1,
+            atomtype=atomtype,
+            q=q,
+            m=m,
+            cgnr=cgnr,
+            atomtypeB=atomtypeB,
+            qB=qB,
+            mB=mB,
+        )
         atoms.append(a)
-    mol = Molecule(atoms = atoms, unity = 'nm')
+    mol = Molecule(atoms=atoms, unity="nm")
     mol.set_resname(entry)
 
-    coords = readSection(res,'[ coords ]','[')
-    coords = parseList('fff',coords)
+    coords = readSection(res, "[ coords ]", "[")
+    coords = parseList("fff", coords)
     for i, atom in enumerate(mol.atoms):
         atom.x = coords[i]
-        atom.unity = 'nm'
+        atom.unity = "nm"
     bonds = []
-    bl = readSection(res,'[ bonds ]','[')
+    bl = readSection(res, "[ bonds ]", "[")
     for line in bl:
         bonds.append(line.split())
     imps = []
-    il = readSection(res,'[ impropers ]','[')
+    il = readSection(res, "[ impropers ]", "[")
     for line in il:
         imps.append(line.split())
     diheds = []
-    dl = readSection(res,'[ dihedrals ]','[')
+    dl = readSection(res, "[ dihedrals ]", "[")
     for line in dl:
         diheds.append(line.split())
     rots = []
-    rl = readSection(res,'[ rotations ]','[')
+    rl = readSection(res, "[ rotations ]", "[")
     for line in rl:
         rots.append(line.split())
     rotdic = {}
@@ -224,27 +241,21 @@ def read_mtp_entry(entry,filename='ffamber99sb.mtp', version = 'old'):
     return mol, bonds, imps, diheds, rotdic
 
 
-def read_mtp(filename = 'ffoplsaa.mtp'):
+def read_mtp(filename="ffoplsaa.mtp"):
 
-    if not hasattr(filename,"read"):
+    if not hasattr(filename, "read"):
         lst = open(filename).readlines()
     else:
         lst = filename.readlines()
-    lst = kickOutComments(lst,';')
+    lst = kickOutComments(lst, ";")
 
-    keyw = ('[ atoms ]','[ bonds ]','[ impropers ]',\
-            '[ dihedrals ]','[ rotations ]')
-    
+    keyw = ("[ atoms ]", "[ bonds ]", "[ impropers ]", "[ dihedrals ]", "[ rotations ]")
+
     entries = []
     for line in lst:
-        if line.startswith('[') and line.strip() not in keyw:
+        if line.startswith("[") and line.strip() not in keyw:
             entries.append(line.strip()[1:-1].strip())
     rdic = {}
     for e in entries:
-        rdic[e] = read_mtp_entry(e,filename)
+        rdic[e] = read_mtp_entry(e, filename)
     return rdic
-
-
-    
-
-

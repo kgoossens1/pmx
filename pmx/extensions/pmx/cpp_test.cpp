@@ -14,7 +14,7 @@
 // versions of this software and its documentation for any purpose and
 // without fee is hereby granted, provided that the above copyright
 // notice appear in all copies and that both the copyright notice and
-// this permission notice appear in supporting documentation, and that
+// this permission notice appear in supporting documentation, and that_asassas
 // the name of Daniel Seeliger not be used in advertising or publicity
 // pertaining to distribution of the software without specific, written
 // prior permission.
@@ -57,11 +57,51 @@ extern "C" {
     {NULL, NULL}
   };
   
-  void init_cpp_test()
-  {    
-    (void) Py_InitModule3("_cpp_test", testMethods, NULL);
-  }
-};
+    #if PY_MAJOR_VERSION >= 3
+        static struct PyModuleDef moduledef = {
+            PyModuleDef_HEAD_INIT,
+            "_cpp_test",
+            "pmx cpp test",
+            -1,
+            test_methods,
+            NULL,
+            NULL,
+            NULL,
+            NULL
+        };
+    #endif
+
+
+static PyObject *
+moduleinit(void)
+{
+    PyObject *m;
+
+    #if PY_MAJOR_VERSION >= 3
+        m = PyModule_Create(&moduledef);
+    #else
+        m = Py_InitModule3("_cpp_test", test_methods, NULL);
+    #endif
+
+    return m;
+}
+
+
+#if PY_MAJOR_VERSION < 3
+    PyMODINIT_FUNC
+    init_cpp_test(void)
+    {
+        moduleinit();
+    }
+#else
+    PyMODINIT_FUNC
+    PyInit__cpp_test(void)
+    {
+        return moduleinit();
+    }
+#endif
+
+ }
 
 
 
