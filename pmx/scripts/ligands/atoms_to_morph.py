@@ -1,5 +1,6 @@
 import sys, os
 import copy as cp
+import numpy as np
 from pmx import *
 from pmx.ndx import *
 from rdkit import Chem
@@ -617,12 +618,11 @@ def restoreAtomNames(mol,atomNameID):
         atom.GetMonomerInfo().SetName(nametoset)
 
 def write_pairs(n1,n2,pairsFilename):
-    fp = open(pairsFilename,"w")
-    for i1,i2 in zip(n1,n2):
-        foo = i1 + 1
-        bar = i2 + 1
-        fp.write("%s\t%s\n" % (foo,bar) )
-    fp.close()    
+    pairs = np.array([n1, n2]).T+1
+    pairs = pairs[np.argsort(pairs[:,0])]
+    print('ted ', pairs)
+    np.savetxt(pairsFilename, pairs, fmt='%10.0f')
+
 
 def calcScore(mol1,mol2,n1,n2,bH2H,bH2heavy):
     res = 0.0
