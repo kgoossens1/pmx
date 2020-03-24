@@ -405,26 +405,26 @@ class Model(Atomselection):
                 prevResName = a.resname
                 if a.name == "C":
                     prevCatom = a
-		if bNewChain==True:
-		    if (a.chain_id==' ') or (a.chain_id==chainID) or (a.chain_id in usedChainIDs):
+                if bNewChain==True:
+                    if (a.chain_id==' ') or (a.chain_id==chainID) or (a.chain_id in usedChainIDs):
                         #print a.chain_id,a,chainID,usedChainIDs
-			# find a new chain id
-			bFound = False
-			while bFound==False:
-			    foo = chainIDstring[0]
-			    chainIDstring = chainIDstring.lstrip(chainIDstring[0])
-			    if foo not in usedChainIDs:
-				bFound=True
-				chainID = foo
-				if bNoNewID==True:
-				    chainID = "pmx"+foo
-				usedChainIDs.append(chainID)
-		    else:
-			chainID = a.chain_id
-			usedChainIDs.append(chainID)
-		a.chain_id = chainID
+                        # find a new chain id
+                        bFound = False
+                        while bFound==False:
+                            foo = chainIDstring[0]
+                            chainIDstring = chainIDstring.lstrip(chainIDstring[0])
+                            if foo not in usedChainIDs:
+                                bFound=True
+                                chainID = foo
+                                if bNoNewID==True:
+                                    chainID = "pmx"+foo
+                                usedChainIDs.append(chainID)
+                    else:
+                        chainID = a.chain_id
+                        usedChainIDs.append(chainID)
+                a.chain_id = chainID
                 self.atoms.append(a)
-		bNewChain = False
+                bNewChain = False
             if line[:6] == 'CRYST1':
                 self.box = _p.box_from_cryst1( line )
 
