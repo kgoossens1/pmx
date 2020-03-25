@@ -620,7 +620,6 @@ def restoreAtomNames(mol,atomNameID):
 def write_pairs(n1,n2,pairsFilename):
     pairs = np.array([n1, n2]).T+1
     pairs = pairs[np.argsort(pairs[:,0])]
-    print('ted ', pairs)
     np.savetxt(pairsFilename, pairs, fmt='%10.0f')
 
 
