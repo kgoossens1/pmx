@@ -1698,6 +1698,7 @@ def main(argv):
         FileOption("-opdbm1", "w/o",["pdb"],"out_pdb_morphe1.pdb", "optional output of the morphable atoms str1"),
         FileOption("-opdbm2", "w/o",["pdb"],"out_pdb_morphe2.pdb", "optional output of the morphable atoms str2"),
         FileOption("-score", "w/o",["dat"],"out_score.dat", "optional output: score of the morph"),
+        FileOption("-oimg", "w/o",["png"],"", "optional output: visualization of the morph"),
         FileOption("-n1", "r/o",["ndx"],"scaffold1" ,"optionally read index of atoms to consider: mol1"),
         FileOption("-n2", "r/o",["ndx"],"scaffold2","optionally read index of atoms to consider: mol2" ),
         ]
@@ -2015,9 +2016,10 @@ def main(argv):
     pairsFile = cmdl['-o']
     write_pairs(n1,n2,pairsFile)
 
-    # write visualization
-    img = getImage(mol1, mol2, n1, n2)
-    img.save(pairsFile+'.png')
+    # create  visualization
+    if(cmdl['-oimg']):
+        img = getImage(mol1, mol2, n1, n2)
+        img.save(cmdl['-oimg'])
 
 main( sys.argv )
 
