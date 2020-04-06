@@ -1,0 +1,354 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""workflow6_check_simulations.py: Checks state of pmx simulations."""
+
+import os
+import re
+import subprocess
+import argparse
+from pmx.workflow import pmxworkflow
+
+__author__ = "David Hahn and Vytas Gapsys"
+__copyright__ = "Copyright (c) 2020 Open Force Field Consortium and de Groot Lab"
+__credits__ = []
+__license__ = "MIT"
+__version__ = "1.0.0"
+__maintainer__ = "David Hahn"
+__email__ = "davidfriedrichhahn@gmail.com"
+__status__ = "Development"
+
+def checkSimulations(pwf, runtype, queueType='sge'):
+    outputString=''
+
+    def getRunCoord(pwf, runtype, run=1, target='xxx', edge='yyy_zzz', wc='water', state='stateA'):
+        if runtype == 'em':
+            return f'{pwf.hybPath}/{edge}/{wc}//crd/ions{run}.pdb'
+        elif runtype == 'nvt':
+            return f'{pwf.runPath}/{edge}/{wc}/{state}/em{run}/em{run}.gro'
+        elif runtype == 'eq': 
+            return f'{pwf.runPath}/{edge}/{wc}/{state}/nvt{run}/nvt{run}.gro'
+        elif runtype == 'morphes': 
+            return f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.gro'
+        else:
+            print('runtype not known')
+            return ''
+
+
+    # workpath/[water|complex]/edge* - every edge has its own folder
+    waterComplex = ['water','complex']
+    # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
+    states = ['stateA','stateB']
+
+    # queue output
+    try:
+        if queueType == 'slurm':
+            process = subprocess.run(f'sacct --user dfhahn --format jobid,jobname%60,state'.split(),
+                                   stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE)
+        elif queueType == 'sge':
+            process = subprocess.run(f'qstat -u dhahn3 -xml -r'.split(),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        queue = process.stdout.decode("utf-8")
+        queueError = process.stderr.decode("utf-8")
+    except Exception as e:
+        queue = ''
+        queueError = ''
+        print('Queue could not be called.')
+
+    # current working directory 
+    cwd = os.getcwd()
+
+    for edge in pwf.edges.keys():
+        pmxworkflow.printInfo(runtype='Check Simulations', run='', target=pwf.target, edge=edge, wc='', state='')
+        for wc in waterComplex:
+            print(f'    - {wc}')
+            for state in states:
+                print(f'        - {state}')
+                for run in pwf.replicates:
+                    print(f'            - Replicate {run}')
+                    jobname = f'pmx{run}_{pwf.target}_{wc}_{edge}_{state}'
+                    queuejob = ''
+                    for line in queue.split('\n'):
+                        if re.search(f'{runtype}{run}_{pwf.target}_{wc}_{edge}_{state}', line) and (re.search('PENDING', line) or re.search('RUNNING', line)):
+                            queuejob += line
+                    if runtype == 'morphes':
+                        jobsresub = 0
+                        jobsrun = 0
+                        jobsfinished = 0
+                        outputString += pmxworkflow.infoString(runtype=runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state)
+                        for i in range(1, 81):
+                            if re.search(f'[{i}]', queuejob) or re.search(f'_{i} ', queuejob):
+                                jobsrun += 1
+                                outputString += f'\33[31mJob {i} in queue.\33[0m\n'
+                                outputString += f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/\n'
+                                continue
+                            if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/dgdl{i}.xvg'):
+                                count = len(open(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/dgdl{i}.xvg').readlines(  ))
+                                if count != 25019:
+                                    print('\33[31mOutput file corrupted.\33[0m')
+                                    outputString += '\33[31mOutput file corrupted.\33[0m\n'
+                                    outputString += f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/\n'
+
+                                    print(f'Submitting job {i} ... ')
+                                    exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
+                                    os.chdir(exePath)
+                                    if queueType == 'slurm':
+                                        process = subprocess.run(f'sbatch --array {i} morphes{run}.sh'.split(),
+                                                             stdout=subprocess.PIPE, 
+                                                             stderr=subprocess.PIPE)
+                                    elif queueType == 'sge':
+                                        process = subprocess.run(f'qsub -t {i} morphes{run}.sh'.split(),
+                                                             stdout=subprocess.PIPE,
+                                                             stderr=subprocess.PIPE)
+                                    if args.verbose:
+                                        print('STDOUT{} '.format(process.stdout.decode('utf8')))
+                                        print('STDERR{} '.format(process.stderr.decode('utf8')))
+                    
+                                    outputString += f'Submitted job {i}\n'
+                                    jobsresub += 1
+                                    os.chdir(cwd)
+                                else:
+                                    jobsfinished += 1
+                            else:
+#                               print(f'Simulation not yet done. File dgdl{i}.xvg does not exist.')                            
+                                outputString += '\33[31mSimulation not (yet) finished.\33[0m\n'
+                                
+                                print(f'Submitting job {i} ... ')
+                                exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
+                                os.chdir(exePath)
+                                if queueType == 'slurm':
+                                    process = subprocess.run(f'sbatch --array {i} morphes{run}.sh'.split(),
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE)
+                                elif queueType == 'sge':
+                                    process = subprocess.run(f'qsub -t {i} morphes{run}.sh'.split(),
+                                                        stdout=subprocess.PIPE,
+                                                        stderr=subprocess.PIPE)
+                                
+                                if args.verbose:
+                                   print('STDOUT{} '.format(process.stdout.decode('utf8')))
+                                   print('STDERR{} '.format(process.stderr.decode('utf8')))
+                                        
+                                outputString += f'Submitted job {i}\n'
+                                jobsresub += 1
+                                os.chdir(cwd)
+                        print(f'Jobs in queue: {jobsrun}')
+                        print(f'Jobs resubmitted: {jobsresub}')
+                        print(f'Jobs finished: {jobsfinished}')
+                        continue
+#                    jobName = 
+
+
+                    if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.log'):
+                        print('log file exists:', end=' ')
+                        with open(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.log') as f:
+                            for line in f.readlines():
+                                if re.search('Finished mdrun', line):
+                                    print(line.strip())
+                                    break
+                            else:
+                                print('\33[31mSimulation not (yet) finished.\33[0m')
+                                outputString += pmxworkflow.infoString(runtype=runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state)
+                                outputString += f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/\n'
+                                outputString += '\33[31mSimulation not (yet) finished.\33[0m\n'
+                                outputString += queuejob + '\n'
+                                # restart job
+                                if queuejob == '' and os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.cpt'):
+                                    # set variables
+                                    # specify input files
+                                    mdp = os.path.abspath(f'{pwf.mdpPath}/{runtype}_{state}.mdp')
+                                    topology = os.path.abspath(f'{pwf.hybPath}/{edge}/{wc}/topol{run}.top')
+                                    coord = os.path.abspath(getRunCoord(pwf, runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state))
+                    
+                                    # specify output files
+                                    tprfile = f'{runtype}{run}.tpr' # temporary tpr file  
+                                    mdout = f'mdout.mdp'
+                
+                                    gromppline = f'gmx grompp -p {topology} '\
+                                                 f'-c {coord} '\
+                                                 f'-o {tprfile} '\
+                                                 f'-f {mdp} '\
+                                                 f'-po {mdout} '\
+                                                 f'-maxwarn 3'
+                                    print(gromppline)
+            
+                                    # set variables
+                                    jobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.sh'
+                                    simpath = f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/'
+                                    jobname = f'{runtype}{run}_{pwf.target}_{wc}_{edge}_{state}'
+
+                                    # write submission file
+#                                     simtime,simcpu = decide_on_resources( wc, runtype )
+#
+#                                     if queueType == 'sge':
+#                                         create_SGE_jobscript( jobscriptFile, gromppline, simpath, jobname, runtype, run, simtime=simtime, simcpu=simcpu )
+#                                     elif queueType == 'slurm':
+#                                         create_SLURM_jobscript( jobscriptFile, gromppline, simpath,
+# jobname, runtype, run, simtime=simtime, simcpu=simcpu, gpu=False)
+
+                                    exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
+                
+                                    os.chdir(exePath)
+
+                                    if queueType == 'slurm':
+                                        process = subprocess.run(f'sbatch pmx{run}.sh'.split(),
+                                                             stdout=subprocess.PIPE,
+                                                             stderr=subprocess.PIPE)
+                                    elif queueType == 'sge':
+                                        process = subprocess.run(f'qsub pmx{run}.sh'.split(),
+                                                             stdout=subprocess.PIPE,
+                                                             stderr=subprocess.PIPE)
+               
+                                    if args.verbose:
+                                        print('STDOUT{} '.format(process.stdout.decode('utf8')))
+                                        print('STDERR{} '.format(process.stderr.decode('utf8')))
+                    
+                                    outputString += 'Submitted job\n'
+                                    os.chdir(cwd)
+                        if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.gro'):
+                            print('final coordinate file exists')
+                        if runtype=='em':
+                            with open(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.log') as f:
+                                for line in f.readlines():
+                                    if re.search('Steepest Descents converged', line):
+                                        print(line.strip())
+                                        break
+                                else:
+                                    print('\33[31mSimulation not (yet) converged.\33[0m')
+                                    outputString += pmxworkflow.infoString(runtype=runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state)
+                                    outputString += '\33[31mSimulation not (yet) converged.\33[0m\n'
+                                    outputString += queuejob + '\n'
+                    else:
+                        print('\33[31mNo log file available, simulation probably not finished\33[0m')
+                        outputString += pmxworkflow.infoString(runtype=runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state)
+                        outputString += '\33[31mNo log file available, simulation probably not finished\33[0m\n'
+                        outputString += queuejob + '\n'
+                        if queuejob == '':
+                            print('Submitting job ... ')
+                            exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
+                
+                            os.chdir(exePath)
+                
+                            if not os.path.isfile(f'pmx{run}.sh'):
+                                print('Submission script does not exist.\nContinue with next simulation.')
+                                os.chdir(cwd)
+                                continue
+
+                            if not os.path.isfile(f'{runtype}{run}.tpr'):
+                                print('Input file does not exist.\nContinue with next simulation.')
+                                os.chdir(cwd)
+                                continue
+
+                            if queueType == 'slurm':
+                                process = subprocess.run(f'sbatch pmx{run}.sh'.split(),
+                                                         stdout=subprocess.PIPE,
+                                                         stderr=subprocess.PIPE)
+                            elif queueType == 'sge':
+                                process = subprocess.run(f'qsub pmx{run}.sh'.split(),
+                                                         stdout=subprocess.PIPE,
+                                                         stderr=subprocess.PIPE)
+               
+                            if args.verbose:
+                                print('STDOUT{} '.format(process.stdout.decode('utf8')))
+                                print('STDERR{} '.format(process.stderr.decode('utf8')))
+                    
+                            outputString += 'Submitted job\n'
+                            os.chdir(cwd)
+
+    return outputString
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', 
+                        '--target', 
+                        metavar = 'TARGET',
+                        type=str,
+                        default='jnk1',
+                        help='The target protein.')
+    parser.add_argument('-s', 
+                        '--simulationtype', 
+                        metavar = 'SIMULATION_TYPE',
+                        type=str,
+                        default='em',
+                        choices = ['em', 'eq', 'nvt', 'morphes'],
+                        help='The simulation type.')
+    parser.add_argument('-f', 
+                        '--forcefield', 
+                        metavar = 'FORCEFIELD',
+                        type=str,
+                        default='smirnoff99Frosst-1.1.0.offxml',
+                        choices = ['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'gaff2'],
+                        help='The force field used.')
+    parser.add_argument('-p',
+                        '--path',
+                        metavar='PATH',
+                        type=str,
+                        default='./',
+                        help='The path to the data.')
+    parser.add_argument('-r',
+                        '--replicates',
+                        metavar='REPLICATES',
+                        nargs='+',
+                        type=str,
+                        default='1',
+                        help='Comma or space separated list of integers or range of integers denoted by hyphen')
+    parser.add_argument('-e',
+                        '--edges',
+                        metavar='EDGES',
+                        nargs='+',
+                        type=str,
+                        default=['all'],
+                        help='Either "all" or a list of edges to be calculated.')
+    parser.add_argument('-q', 
+                        '--queuetype', 
+                        metavar = 'QUEUE',
+                        type=str,
+                        default='slurm',
+                        choices = ['slurm', 'sge'],
+                        help='The queue type of the job scripts.')
+    parser.add_argument('-v', 
+                        '--verbose', 
+                        type=bool,
+                        nargs='?',
+                        const=True,
+                        default=False,
+                        help='Turn on verbose output.')
+    args = parser.parse_args()
+
+    replicates = args.replicates
+    replicates = [n for r in replicates for n in r.split(',') if n is not '']
+    replicates = [n for r in replicates for n in ' - '.join(r.split('-')).split()]
+    replicatesToUse = []
+    for i, r in enumerate(replicates):
+        if r == '-':
+            replicatesToUse += range(int(replicates[i - 1]) + 1, int(replicates[i + 1]), 1)
+        else:
+            replicatesToUse.append(int(r))
+
+    pwf = pmxworkflow.pmxvariables(target=args.target,
+                                   forcefield=args.forcefield,
+                                   path=args.path,
+                                   replicates=replicatesToUse,
+                                   verbose=args.verbose)
+
+    if args.edges[0] != 'all':
+        edges = dict()
+        for edge in args.edges:
+            edges[edge] = pwf.edges[edge]
+        pwf.edges = edges
+
+    outputString = checkSimulations(pwf, runtype=args.simulationtype, queueType=args.queuetype)
+
+    
+    print('=' * 80)
+    print('=' * 80)
+    print('=== SUMMARY OF UNSUCCESSFUL RUNS ===')
+    print('=' * 80)
+    print('=' * 80)
+    print(outputString)
+
+
+
