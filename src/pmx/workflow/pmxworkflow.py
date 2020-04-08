@@ -8,6 +8,24 @@ A collection of notebooks and scripts for calculating free energies with pmx.
 Handles the primary functions
 """
 
+import os
+import shutil
+
+from openforcefield.utils import toolkits
+
+### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
+### Attention: there could be problems in the workflow due to atom order changes, this is related to this issue: https://github.com/openforcefield/openforcefield/issues/475
+#toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+
+### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
+toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+
+toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
+
+import pmx
+from PLBenchmarks import targets, ligands, edges
+
+
 __author__ = "David Hahn and Vytas Gapsys"
 __copyright__ = "Copyright (c) 2020 Open Force Field Consortium and de Groot Lab"
 __credits__ = []
@@ -17,10 +35,6 @@ __maintainer__ = "David Hahn"
 __email__ = "davidfriedrichhahn@gmail.com"
 __status__ = "Development"
 
-from PLBenchmarks import targets, ligands, edges
-import pmx
-import os
-import shutil
 
 
 def canvas(with_attribution=True):

@@ -7,6 +7,18 @@ import os
 from pmx.workflow import pmxworkflow
 import argparse
 import subprocess
+
+from openforcefield.utils import toolkits
+
+### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
+### Attention: there could be problems in the workflow due to atom order changes, this is related to this issue: https://github.com/openforcefield/openforcefield/issues/475
+#toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+
+### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
+toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+
+toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
+
 from openforcefield.topology import Molecule
 
 __author__ = "David Hahn and Vytas Gapsys"
