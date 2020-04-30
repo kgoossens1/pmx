@@ -160,7 +160,7 @@ class pmxvariables:
         # path to pmx scripts
         self.scriptpath = pmx.__path__[0] + '/scripts/ligands/'
         # path to mdp
-        self.mdpPath = os.path.abspath(os.path.dirname(__file__)) + '/data/mdppath/'
+        self.mdpPath = os.path.abspath(pmx.__path__[0]) + '/data/mdppath/'
         # forcefield
         self.forcefield = forcefield
         # target

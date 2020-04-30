@@ -22,6 +22,9 @@ __status__ = "Development"
 
 
 def read_neq_results( fname ):
+    if not os.path.exists(fname):
+        print('File does not exist')
+        return []
     fp = open(fname,'r')
     lines = fp.readlines()
     fp.close()
@@ -68,7 +71,7 @@ def analyzeSimulations(pwf):
     newdf = pd.DataFrame(columns=index)
 
     # workpath/[water|complex]/edge* - every edge has its own folder
-    waterComplex = ['water','protein']
+    waterComplex = ['water','complex']
     # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
     states = ['stateA','stateB']
 
@@ -77,16 +80,16 @@ def analyzeSimulations(pwf):
         for wc in waterComplex:
             print(f'    - {wc}')
             for run in pwf.replicates:
-                os.makedirs(f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}', exist_ok=True)
+                os.makedirs(f'{pwf.runPath}/{edge}/{wc}/analyse{run}', exist_ok=True)
 
                 # input files
-                fa = [f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/stateA/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
-                fb = [f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/stateB/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
+                fa = [f'{pwf.runPath}/{edge}/{wc}/stateA/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
+                fb = [f'{pwf.runPath}/{edge}/{wc}/stateB/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
                 # output files
-                result = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/results.txt'
-                outWorkA = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/integA.dat'
-                outWorkB = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/integB.dat'
-                # plot = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/plot.png'
+                result = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/results.txt'
+                outWorkA = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/integA.dat'
+                outWorkB = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/integB.dat'
+                # plot = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/plot.png'
 
                 cmdline = f'pmx analyse -fA {" ".join(fa)} '\
                 f'-fB {" ".join(fb)} '\
@@ -116,16 +119,14 @@ def analyzeSimulations(pwf):
                 # ---------------------------------
 
                 print(result)
-                if os.path.exists(result):
-                    foo = read_neq_results( result )
-                    if len(foo) > 1:
-                        print(foo)
-                        df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
-                        df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
-                        df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
-                        df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
-                        for t in ['val', 'err', 'aerr', 'conv']:
-                            newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
+                foo = read_neq_results( result )
+                if len(foo) > 1:
+                    df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
+                    df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
+                    df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
+                    df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
+                    for t in ['val', 'err', 'aerr', 'conv']:
+                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
                 else:
                     df.loc[f'{edge}_{wc}{run}','val'] = np.nan
                     df.loc[f'{edge}_{wc}{run}','err'] = np.nan
@@ -141,10 +142,10 @@ def analyzeSimulations(pwf):
         aerrs = []
         for run in pwf.replicates:
             ##### calculate ddg #####
-            ddg = df.loc[f'{edge}_protein{run}','val'] - df.loc[f'{edge}_water{run}','val']
-            err = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','err'],2.0) +
+            ddg = df.loc[f'{edge}_complex{run}','val'] - df.loc[f'{edge}_water{run}','val']
+            err = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','err'],2.0) +
                            np.power(df.loc[f'{edge}_water{run}','err'],2.0) )
-            aerr = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','aerr'],2.0) +
+            aerr = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','aerr'],2.0) +
                             np.power(df.loc[f'{edge}_water{run}','aerr'],2.0) )
             print(ddg, err, aerr)
             df.loc[f'{edge}_ddg{run}','val'] = ddg
