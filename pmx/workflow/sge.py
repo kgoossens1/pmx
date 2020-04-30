@@ -21,18 +21,34 @@ def scriptHeader( fname, jobname, simtime=1, simcpu=4):
 #$ -cwd\n\
 #$ -q all.q\n\
 #$ -j yes\n\
-#$ -l slot_type=gromacsp3,affinity_group=default\n\n\
-source /home/dhahn3/bin/gromacs-patched/bin/GMXRC\n\n\
+#$ -l slot_type=gromacs,affinity_group=default\n\n\
+export LD_LIBRARY_PATH=/shared/app/cuda/10.1/toolkit/lib64/:$LD_LIBRARY_PATH\n\n\
+source /home/dhahn3/bin/gromacs-patched-76/bin/GMXRC\n\n\
+export GMXLIB=/shared/data/gromacs/dhahn3/ffamber/mutff45/\n\n\
 mkdir -p $TMPDIR/$JOB_ID/\n\
 cd $TMPDIR/$JOB_ID/\n\n'
     fp.write(jobline)
     fp.close()
 
+
+def scriptAppend( fname, commands ):
+    fp = open(fname, 'a')
+    fp.write(commands)
+    fp.close()
+
+
 def scriptMain( fname, gromppline, simpath, runtype, run, simtime=4, simcpu=1 ):
     fp = open(fname, 'a')
 
+    runargs = ''
+    print(runtype)
+    if runtype == 'em':
+        runargs = f'-ntmpi 1 -ntomp {simcpu} -pin on'
+    else:
+        runargs = f'-pme gpu -ntmpi 1 -ntomp {simcpu} -pin on'
+
     jobline = f'{gromppline}\n\
-gmx mdrun -ntmpi 1 -ntomp {simcpu} -pme gpu -pin on -s {runtype}{run}.tpr -deffnm {runtype}{run}\n\
+gmx mdrun {runargs} -s {runtype}{run}.tpr -deffnm {runtype}{run}\n\
 rsync -avzIi ./ {simpath}/\n\
 rm -v $TMPDIR/$JOB_ID/*.*\n\n'
     fp.write(jobline)
@@ -47,3 +63,33 @@ rmdir -v $TMPDIR/$JOB_ID\n\
             '
     fp.write(jobline)
     fp.close()
+
+
+def scriptArrayjob(fname, gromppline, simpath, jobname, runtype, run, simtime=4, simcpu=1):
+    fp = open(fname,'w')
+    
+    runargs = f'-pme gpu -ntmpi 1 -ntomp {simcpu} -pin on'
+
+    jobline = f'#! /usr/bin/bash\n\
+#$ -N {jobname}\n\
+#$ -cwd\n\
+#$ -q all.q\n\
+#$ -j yes\n\
+#$ -t 1-80\n\
+#$ -l slot_type=gromacs,affinity_group=default\n\n\
+export LD_LIBRARY_PATH=/shared/app/cuda/10.1/toolkit/lib64/:$LD_LIBRARY_PATH\n\n\
+source /home/dhahn3/bin/gromacs-patched-76/bin/GMXRC\n\n\
+export GMXLIB=/shared/data/gromacs/dhahn3/ffamber/mutff45/\n\n\
+\n\
+WORKDIR=$(pwd)\n\
+mkdir -p $TMPDIR/$JOB_ID/$SGE_TASK_ID\n\
+cd $TMPDIR/$JOB_ID/$SGE_TASK_ID\n\
+\n\
+{gromppline}\n\n\
+gmx mdrun {runargs} -s tpr.tpr \n\n\
+rsync -avzIi dhdl.xvg {simpath}/dgdl$SGE_TASK_ID.xvg\n\n\
+rm -v $TMPDIR/$JOB_ID/$SGE_TASK_ID/*.*\n\n\
+rmdir -v $TMPDIR/$JOB_ID/$SGE_TASK_ID'
+    fp.write(jobline)    
+    fp.close()
+

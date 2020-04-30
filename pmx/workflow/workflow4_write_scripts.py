@@ -6,6 +6,7 @@
 import argparse
 import os
 import sys
+import shutil
 import glob
 from pmx.workflow import pmxworkflow, sge, slurm
 
@@ -150,28 +151,70 @@ def prepareSimulations(pwf, runtype, queueType):
 
                         # specify input files
                         mdp = os.path.abspath(f'{pwf.mdpPath}/{rt}_{state}.mdp')
-                        topology = os.path.abspath(f'{pwf.hybPath}/{edge}/{wc}/topol{run}.top')
+                        topology = os.path.abspath(f'{pwf.hybPath}/{edge}/{wc}/top/openff-1.0.0.offxml/topol{run}.top')
                         coord = os.path.abspath(getRunCoord(rt, run=run, target=pwf.target, edge=edge, wc=wc, state=state))
                         # specify output files
                         tprfile = f'{rt}{run}.tpr'  # temporary tpr file
                         mdout = f'mdout.mdp'
 
-                        gromppline = f'gmx grompp -p {topology} ' \
-                            f'-c {coord} ' \
-                            f'-o {tprfile} ' \
-                            f'-f {mdp} ' \
-                            f'-po {mdout} ' \
-                            f'-maxwarn 3'
-
-
-
-                        # write submission file
+                        # decide about resources
                         simtime, simcpu = decide_on_resources(wc, rt)
 
-                        if queueType == 'sge':
-                            sge.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
-                        elif queueType == 'slurm':
-                            slurm.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
+                        if rt == 'morphes':
+                            tprfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.tpr') # tpr file  
+                            trjfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.trr') # trr file  
+                            mdout = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/mdout.mdp')
+
+                            framefile = os.path.abspath(f'{simPath}/frame.gro') # frames
+
+                            commands = f'echo 0 | '\
+                                       f'gmx trjconv -s {tprfile}\\\n'\
+                                       f'            -f {trjfile}\\\n'\
+                                       f'            -o {framefile}\\\n'\
+                                       f'            -sep \\\n'\
+                                       f'            -ur compact \\\n'\
+                                       f'            -pbc mol \\\n'\
+                                       f'            -b 2256\n\n'\
+                                       f'mv {simPath}/frame0.gro {simPath}/frame80.gro\n\n'
+
+                            if queueType == 'sge':
+                                sge.scriptAppend(jobscriptFile, commands)
+                            elif queueType == 'slurm':
+                                slurm.scriptAppend(jobscriptFile, commands)
+
+                            # create array jobscript
+                            arrayjobname = f'morphes{run}_{pwf.target}_{edge}_{wc}_{state}'
+                            arrayjobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/morphes{run}.sh'
+                            gromppline = f'gmx grompp -p  {topology}\\\n'\
+                                         f'           -c  {simPath}/frame$SGE_TASK_ID.gro\\\n'\
+                                         f'           -o  tpr.tpr\\\n'\
+                                         f'           -f  {mdp}\\\n'\
+                                         f'           -po mdout$SGE_TASK_ID.mdp\\\n'\
+                                         f'           -maxwarn 2\n'\
+
+                            sge.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
+
+                            qsub_exec = shutil.which('qsub')
+                            submitPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/')
+                            commands = f'cd {submitPath}\n'\
+                                       f'{qsub_exec} morphes{run}.sh\n\n'
+                            if queueType == 'sge':
+                                sge.scriptAppend(jobscriptFile, commands)
+                            elif queueType == 'slurm':
+                                slurm.scriptAppend(jobscriptFile, commands)
+
+                        else: # em, nvt, eq
+                            gromppline = f'gmx grompp -p {topology} '\
+                                              f'-c {coord} '\
+                                              f'-o {tprfile} '\
+                                              f'-f {mdp} '\
+                                              f'-po {mdout} '\
+                                              f'-maxwarn 3'
+
+                            if queueType == 'sge':
+                                sge.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
+                            elif queueType == 'slurm':
+                                slurm.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
                     if queueType == 'sge':
                         sge.scriptFooter(jobscriptFile)
                     elif queueType == 'slurm':

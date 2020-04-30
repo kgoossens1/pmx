@@ -35,7 +35,7 @@ def submitSimulations(pwf, numsim=None):
                 for run in pwf.replicates:
                     print(f'            - Replicate {run}')
                     jobname = f'pmx{run}_{pwf.target}_{wc}_{edge}_{state}'
-                    exePath = f'{pwf.runPath}/{wc}/{edge}/{state}/'
+                    exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
                 
                     os.chdir(exePath)
                 
