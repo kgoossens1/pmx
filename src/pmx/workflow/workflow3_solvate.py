@@ -164,10 +164,11 @@ def combineProteinLigand(pwf):
         # input
         proteinFile = f'{pwf.protPath}/crd/protein.pdb'  # input protein structure with ions, cofactors and crystal waters
         ligandFile = f'{pwf.hybPath}/{edge}/water/crd/mergedA.pdb'  # input ligand structure
+        waterFile = f'{pwf.protPath}/crd/water.pdb'  # input protein structure with ions, cofactors and crystal waters
         #output
         complexFile = f'{pwf.hybPath}/{edge}/complex/crd/complex.pdb' # complex of the former two structures
 
-        assembleComplex(complexFile, molfiles=[proteinFile, ligandFile])
+        assembleComplex(complexFile, molfiles=[proteinFile, ligandFile, waterFile])
 
         # assemble topologies
         proteinTop = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/topol.top' # protein topology
@@ -193,7 +194,8 @@ def combineProteinLigand(pwf):
         for l in lines[i+1:]:
             molecules.append(l.split())
         # add ligand molecule
-        molecules.append(['MOL', 1])
+        molecules.insert(1, ['MOL', 1])
+        print(molecules)
 
         pmxworkflow.create_top(fname=f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p',
                    itp=includes, mols=molecules,

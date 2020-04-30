@@ -21,8 +21,8 @@ __email__ = "davidfriedrichhahn@gmail.com"
 __status__ = "Development"
 
 
-def read_neq_results(fname):
-    fp = open(fname, 'r')
+def read_neq_results( fname ):
+    fp = open(fname,'r')
     lines = fp.readlines()
     fp.close()
     out = []
@@ -33,7 +33,11 @@ def read_neq_results(fname):
             out.append(float(foo[-2]))
         elif 'BAR: Std Err (bootstrap)' in l:
             out.append(float(foo[-2]))
-    return (out)
+        elif 'BAR: Std Err (analytical)' in l:
+            out.append(float(foo[-2]))
+        elif 'BAR: Conv' in l:
+            out.append(float(foo[-1]))
+    return(out)
 
 
 def output_textfile(pwf, df, fname):
@@ -64,7 +68,7 @@ def analyzeSimulations(pwf):
     newdf = pd.DataFrame(columns=index)
 
     # workpath/[water|complex]/edge* - every edge has its own folder
-    waterComplex = ['water','complex']
+    waterComplex = ['water','protein']
     # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
     states = ['stateA','stateB']
 
@@ -73,16 +77,16 @@ def analyzeSimulations(pwf):
         for wc in waterComplex:
             print(f'    - {wc}')
             for run in pwf.replicates:
-                os.makedirs(f'{pwf.runPath}/{edge}/{wc}/analyse{run}', exist_ok=True)
+                os.makedirs(f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}', exist_ok=True)
 
                 # input files
-                fa = [f'{pwf.runPath}/{edge}/{wc}/stateA/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
-                fb = [f'{pwf.runPath}/{edge}/{wc}/stateB/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
+                fa = [f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/stateA/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
+                fb = [f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/stateB/morphes{run}/dgdl{i}.xvg' for i in range(1, 81)]
                 # output files
-                result = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/results.txt'
-                outWorkA = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/integA.dat'
-                outWorkB = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/integB.dat'
-                # plot = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/plot.png'
+                result = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/results.txt'
+                outWorkA = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/integA.dat'
+                outWorkB = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/integB.dat'
+                # plot = f'{pwf.runPath}/{pwf.forcefield}/{wc}/{edge}/analyse{run}/plot.png'
 
                 cmdline = f'pmx analyse -fA {" ".join(fa)} '\
                 f'-fB {" ".join(fb)} '\
@@ -96,7 +100,7 @@ def analyzeSimulations(pwf):
                 f'--no_ks '\
                 f'--unit kcal'
 
-                print(cmdline)
+#                print(cmdline)
                 process = subprocess.Popen(cmdline.split(),
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
@@ -111,46 +115,48 @@ def analyzeSimulations(pwf):
                 # Processing of the results: calculate ddG, compute means, output
                 # ---------------------------------
 
-
-
-
-
-                out = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/results.txt'
-                foo = read_neq_results( out )
-                if len(foo) > 1:
-                    df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
-                    df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
-                    df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
-                    df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
-                    for t in ['val', 'err', 'aerr', 'conv']:
-                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wp}{run}', t]
+                print(result)
+                if os.path.exists(result):
+                    foo = read_neq_results( result )
+                    if len(foo) > 1:
+                        print(foo)
+                        df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
+                        df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
+                        df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
+                        df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
+                        for t in ['val', 'err', 'aerr', 'conv']:
+                            newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
                 else:
+                    df.loc[f'{edge}_{wc}{run}','val'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','err'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','aerr'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','conv'] = np.nan
+                    for t in ['val', 'err', 'aerr', 'conv']:
+                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
                     print('Results could not be read')
 
 
         vals = []
         errs = []
         aerrs = []
-        for run in replicates:
-            try:
-                ##### calculate ddg #####
-                ddg = df.loc[f'{edge}_protein{run}','val'] - df.loc[f'{edge}_water{run}','val']
-                err = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','err'],2.0) +
-                               np.power(df.loc[f'{edge}_water{run}','err'],2.0) )
-                aerr = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','aerr'],2.0) +
-                               np.power(df.loc[f'{edge}_water{run}','aerr'],2.0) )
+        for run in pwf.replicates:
+            ##### calculate ddg #####
+            ddg = df.loc[f'{edge}_protein{run}','val'] - df.loc[f'{edge}_water{run}','val']
+            err = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','err'],2.0) +
+                           np.power(df.loc[f'{edge}_water{run}','err'],2.0) )
+            aerr = np.sqrt( np.power(df.loc[f'{edge}_protein{run}','aerr'],2.0) +
+                            np.power(df.loc[f'{edge}_water{run}','aerr'],2.0) )
+            print(ddg, err, aerr)
+            df.loc[f'{edge}_ddg{run}','val'] = ddg
+            df.loc[f'{edge}_ddg{run}','err'] = err
+            df.loc[f'{edge}_ddg{run}','aerr'] = aerr
+            newdf.loc[f'{edge}', ('ddg', run, 'val')] = ddg
+            newdf.loc[f'{edge}', ('ddg', run, 'err')] = err
+            newdf.loc[f'{edge}', ('ddg', run, 'aerr')] = aerr
+            vals.append(ddg)
+            errs.append(err)
+            aerrs.append(aerr)
 
-                df.loc[f'{edge}_ddg{run}','val'] = ddg
-                df.loc[f'{edge}_ddg{run}','err'] = err
-                df.loc[f'{edge}_ddg{run}','aerr'] = aerr
-                newdf.loc[f'{edge}', ('ddg', run, 'val')] = ddg
-                newdf.loc[f'{edge}', ('ddg', run, 'err')] = err
-                newdf.loc[f'{edge}', ('ddg', run, 'aerr')] = aerr
-                vals.append(ddg)
-                errs.append(err)
-                aerrs.append(aerr)
-            except:
-                print('Did not work')
 
         ###### calculate mean dg with err ######
         # mean ddg
@@ -172,27 +178,14 @@ def analyzeSimulations(pwf):
             stderr = errs[0]
             df.loc[f'{edge}_ddg','err'] = stderr
 
-        distribs = []
-        for v, e in zip(vals, aerrs):
-            distribs.append(np.random.normal(v,e,size=bootnum))
-        if len(distribs) > 1:
-            distr = np.vstack(distribs)
-            # 2) calculate stderrs
-            stderr = np.mean( np.sqrt( np.var(distr,ddof=1,axis=0)/np.float(len(distribs)) ) )
-            df.loc[f'{edge}_ddg','aerr'] = stderr
-            print(mean, stderr)
-        else:
-            stderr = errs[0]
-            df.loc[f'{edge}_ddg','aerr'] = stderr
-
         for t in ['val', 'err', 'aerr']:
             newdf.loc[f'{edge}', ('ddg_mean', '-', t)] = df.loc[f'{edge}_ddg', t]
 
     ###### output ######
-    os.makedirs(f'{pwf.runPath}/results', exist_ok=True)
-    output_textfile( df, f'{pwf.runPath}/results/{pwf.target}_{pwf.forcefield}.dat' )
+    os.makedirs(f'{pwf.runPath}/{pwf.forcefield}/results', exist_ok=True)
+    output_textfile( pwf,  df, f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.dat' )
 
-    newdf.to_csv(f'{pwf.runPath}/results/{pwf.target}_{pwf.forcefield}.csv', float_format='%10.2f')
+    newdf.to_csv(f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.csv', float_format='%10.2f')
 
 
 if __name__ == '__main__':

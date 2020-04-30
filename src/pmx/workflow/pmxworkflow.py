@@ -178,7 +178,7 @@ class pmxvariables:
         self.protPath = f'{self.basePath}/{self.targetDir}/01_protein/'
         self.ligPath = f'{self.basePath}/{self.targetDir}/02_ligands/'
         self.hybPath = f'{self.basePath}/{self.targetDir}/03_hybrid/'
-        self.runPath = f'{self.basePath}/{self.targetDir}/04_pmx/'
+        self.runPath = f'{self.basePath}/{self.targetDir}/06_pmx/'
 
         # all simulations will be done in 3 replicates
         self.replicates = replicates
