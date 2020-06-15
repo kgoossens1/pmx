@@ -65,6 +65,113 @@ def query_yes_no(question, default='no'):
             sys.stdout.write("Please respond with 'yes' or 'no' " \
                              "(or 'y' or 'n').\n")
 
+def getRunCoord(pwf, runtype, run=1, target='xxx', edge='yyy_zzz', wc='water', state='stateA'):
+    if runtype == 'em':
+        return f'{pwf.hybPath}/{edge}/{wc}/crd/ions{run}.pdb'
+    elif runtype == 'nvt':
+        return f'{pwf.runPath}/{edge}/{wc}/{state}/em{run}/em{run}.gro'
+    elif runtype == 'eq':
+        return f'{pwf.runPath}/{edge}/{wc}/{state}/nvt{run}/nvt{run}.gro'
+    elif runtype == 'morphes':
+        return f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.gro'
+    else:
+        print('runtype not known')
+        return ''
+
+
+def writeScript(pwf, edge, wc, state, runtype, run, queueType):
+    jobname = f'pmx{run}_{pwf.target}_{edge}_{wc}_{state}'
+    # make parent directory for runs
+    os.makedirs(os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}'), exist_ok=True)
+    jobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/pmx{run}.sh'
+    if queueType == 'sge':
+        sge.scriptHeader(jobscriptFile, jobname)
+    elif queueType == 'slurm':
+        slurm.scriptHeader(jobscriptFile, jobname, simtime=7, simcpu=8)
+
+    for rt in ['em', 'nvt', 'eq', 'morphes']:
+        if rt not in runtype:
+            continue
+        # set simulation path
+        simPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/{rt}{run}/')
+        # create folder
+        os.makedirs(simPath, exist_ok=True)
+
+        if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/pmx{run}.log'):
+            # run log exists, so nothing is deleted
+            print(f'Simulation {rt} has been run already, nothing is deleted. Continue with next simulation.')
+            continue
+
+        # specify input files
+        mdp = os.path.abspath(f'{pwf.mdpPath}/{rt}_{state}.mdp')
+        topology = os.path.abspath(f'{pwf.hybPath}/{edge}/{wc}/top/openff-1.0.0.offxml/topol{run}.top')
+        coord = os.path.abspath(getRunCoord(pwf, rt, run=run, target=pwf.target, edge=edge, wc=wc, state=state))
+        # specify output files
+        tprfile = f'{rt}{run}.tpr'  # temporary tpr file
+        mdout = f'mdout.mdp'
+
+        # decide about resources
+        simtime, simcpu = decide_on_resources(wc, rt)
+
+        if rt == 'morphes':
+            tprfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.tpr') # tpr file  
+            trjfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.trr') # trr file  
+            mdout = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/mdout.mdp')
+
+            framefile = os.path.abspath(f'{simPath}/frame.gro') # frames
+
+            commands = f'echo 0 | '\
+                       f'gmx trjconv -s {tprfile}\\\n'\
+                       f'            -f {trjfile}\\\n'\
+                       f'            -o {framefile}\\\n'\
+                       f'            -sep \\\n'\
+                       f'            -ur compact \\\n'\
+                       f'            -pbc mol \\\n'\
+                       f'            -b 2256\n\n'\
+                       f'mv {simPath}/frame0.gro {simPath}/frame80.gro\n\n'
+
+            if queueType == 'sge':
+                sge.scriptAppend(jobscriptFile, commands)
+            elif queueType == 'slurm':
+                slurm.scriptAppend(jobscriptFile, commands)
+
+            # create array jobscript
+            arrayjobname = f'morphes{run}_{pwf.target}_{edge}_{wc}_{state}'
+            arrayjobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/morphes{run}.sh'
+            gromppline = f'gmx grompp -p  {topology}\\\n'\
+                         f'           -c  {simPath}/frame$SGE_TASK_ID.gro\\\n'\
+                         f'           -o  tpr.tpr\\\n'\
+                         f'           -f  {mdp}\\\n'\
+                         f'           -po mdout$SGE_TASK_ID.mdp\\\n'\
+                         f'           -maxwarn 2\n'\
+
+            sge.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
+
+            qsub_exec = shutil.which('qsub')
+            submitPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/')
+            commands = f'cd {submitPath}\n'\
+                       f'{qsub_exec} morphes{run}.sh\n\n'
+            if queueType == 'sge':
+                sge.scriptAppend(jobscriptFile, commands)
+            elif queueType == 'slurm':
+                slurm.scriptAppend(jobscriptFile, commands)
+
+        else: # em, nvt, eq
+            gromppline = f'gmx grompp -p {topology} '\
+                         f'-c {coord} '\
+                         f'-o {tprfile} '\
+                         f'-f {mdp} '\
+                         f'-po {mdout} '\
+                         f'-maxwarn 3'
+
+            if queueType == 'sge':
+                sge.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
+            elif queueType == 'slurm':
+                slurm.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
+    if queueType == 'sge':
+        sge.scriptFooter(jobscriptFile)
+    elif queueType == 'slurm':
+        slurm.scriptFooter(jobscriptFile)
 
 def deleteRunFiles(pwf, runtype):
     if query_yes_no('WARNING: All files in simulation directories will be deleted '
@@ -96,19 +203,6 @@ def deleteRunFiles(pwf, runtype):
 
 def prepareSimulations(pwf, runtype, queueType):
 
-    def getRunCoord(runtype, run=1, target='xxx', edge='yyy_zzz', wc='water', state='stateA'):
-        if runtype == 'em':
-            return f'{pwf.hybPath}/{edge}/{wc}/crd/ions{run}.pdb'
-        elif runtype == 'nvt':
-            return f'{pwf.runPath}/{edge}/{wc}/{state}/em{run}/em{run}.gro'
-        elif runtype == 'eq':
-            return f'{pwf.runPath}/{edge}/{wc}/{state}/nvt{run}/nvt{run}.gro'
-        elif runtype == 'morphes':
-            return f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.gro'
-        else:
-            print('runtype not known')
-            return ''
-
     # workpath/edge*/[water|complex]/ - every edge has its own folder
     waterComplex = ['water', 'complex']
     # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
@@ -122,103 +216,7 @@ def prepareSimulations(pwf, runtype, queueType):
                 print(f'        - {state}')
                 for run in pwf.replicates:
                     print(f'            - Replicate {run}')
-                    jobname = f'pmx{run}_{pwf.target}_{edge}_{wc}_{state}'
-                    # make parent directory for runs
-                    os.makedirs(os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}'), exist_ok=True)
-                    jobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/pmx{run}.sh'
-                    if queueType == 'sge':
-                        sge.scriptHeader(jobscriptFile, jobname)
-                    elif queueType == 'slurm':
-                        slurm.scriptHeader(jobscriptFile, jobname, simtime=7, simcpu=8)
-
-                    for rt in ['em', 'nvt', 'eq', 'morphes']:
-                        if rt not in runtype:
-                            continue
-                        # set simulation path
-                        simPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/{rt}{run}/')
-                        # create folder
-                        os.makedirs(simPath, exist_ok=True)
-
-                        if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/pmx{run}.log'):
-                            # run log exists, so nothing is deleted
-                            print(
-                                f'Simulation {rt} has been run already, nothing is deleted. Continue with next simulation.')
-                            continue
-                        else:
-                            toclean = glob.glob(f'{simPath}/*.*')
-                            for clean in toclean:
-                                os.remove(clean)
-
-                        # specify input files
-                        mdp = os.path.abspath(f'{pwf.mdpPath}/{rt}_{state}.mdp')
-                        topology = os.path.abspath(f'{pwf.hybPath}/{edge}/{wc}/top/openff-1.0.0.offxml/topol{run}.top')
-                        coord = os.path.abspath(getRunCoord(rt, run=run, target=pwf.target, edge=edge, wc=wc, state=state))
-                        # specify output files
-                        tprfile = f'{rt}{run}.tpr'  # temporary tpr file
-                        mdout = f'mdout.mdp'
-
-                        # decide about resources
-                        simtime, simcpu = decide_on_resources(wc, rt)
-
-                        if rt == 'morphes':
-                            tprfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.tpr') # tpr file  
-                            trjfile = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/eq{run}/eq{run}.trr') # trr file  
-                            mdout = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/mdout.mdp')
-
-                            framefile = os.path.abspath(f'{simPath}/frame.gro') # frames
-
-                            commands = f'echo 0 | '\
-                                       f'gmx trjconv -s {tprfile}\\\n'\
-                                       f'            -f {trjfile}\\\n'\
-                                       f'            -o {framefile}\\\n'\
-                                       f'            -sep \\\n'\
-                                       f'            -ur compact \\\n'\
-                                       f'            -pbc mol \\\n'\
-                                       f'            -b 2256\n\n'\
-                                       f'mv {simPath}/frame0.gro {simPath}/frame80.gro\n\n'
-
-                            if queueType == 'sge':
-                                sge.scriptAppend(jobscriptFile, commands)
-                            elif queueType == 'slurm':
-                                slurm.scriptAppend(jobscriptFile, commands)
-
-                            # create array jobscript
-                            arrayjobname = f'morphes{run}_{pwf.target}_{edge}_{wc}_{state}'
-                            arrayjobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/morphes{run}.sh'
-                            gromppline = f'gmx grompp -p  {topology}\\\n'\
-                                         f'           -c  {simPath}/frame$SGE_TASK_ID.gro\\\n'\
-                                         f'           -o  tpr.tpr\\\n'\
-                                         f'           -f  {mdp}\\\n'\
-                                         f'           -po mdout$SGE_TASK_ID.mdp\\\n'\
-                                         f'           -maxwarn 2\n'\
-
-                            sge.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
-
-                            qsub_exec = shutil.which('qsub')
-                            submitPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/')
-                            commands = f'cd {submitPath}\n'\
-                                       f'{qsub_exec} morphes{run}.sh\n\n'
-                            if queueType == 'sge':
-                                sge.scriptAppend(jobscriptFile, commands)
-                            elif queueType == 'slurm':
-                                slurm.scriptAppend(jobscriptFile, commands)
-
-                        else: # em, nvt, eq
-                            gromppline = f'gmx grompp -p {topology} '\
-                                              f'-c {coord} '\
-                                              f'-o {tprfile} '\
-                                              f'-f {mdp} '\
-                                              f'-po {mdout} '\
-                                              f'-maxwarn 3'
-
-                            if queueType == 'sge':
-                                sge.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
-                            elif queueType == 'slurm':
-                                slurm.scriptMain(jobscriptFile, gromppline, simPath, rt, run, simcpu=simcpu)
-                    if queueType == 'sge':
-                        sge.scriptFooter(jobscriptFile)
-                    elif queueType == 'slurm':
-                        slurm.scriptFooter(jobscriptFile)
+                    writeScript(pwf, edge, wc, state, runtype, run, queueType)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

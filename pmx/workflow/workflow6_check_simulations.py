@@ -8,7 +8,7 @@ import re
 import subprocess
 import argparse
 from pmx.workflow import pmxworkflow
-
+from pmx.workflow import workflow4_write_scripts
 __author__ = "David Hahn and Vytas Gapsys"
 __copyright__ = "Copyright (c) 2020 Open Force Field Consortium and de Groot Lab"
 __credits__ = []
@@ -78,6 +78,7 @@ def checkSimulations(pwf, runtype, queueType='sge'):
                         jobsrun = 0
                         jobsfinished = 0
                         outputString += pmxworkflow.infoString(runtype=runtype, run=run, target=pwf.target, edge=edge, wc=wc, state=state)
+                        jobsforresub = []
                         for i in range(1, 81):
                             if re.search(f'[{i}]', queuejob) or re.search(f'_{i} ', queuejob):
                                 jobsrun += 1
@@ -90,55 +91,45 @@ def checkSimulations(pwf, runtype, queueType='sge'):
                                     print('\33[31mOutput file corrupted.\33[0m')
                                     outputString += '\33[31mOutput file corrupted.\33[0m\n'
                                     outputString += f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/\n'
-
-                                    print(f'Submitting job {i} ... ')
-                                    exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
-                                    os.chdir(exePath)
-                                    if queueType == 'slurm':
-                                        process = subprocess.run(f'sbatch --array {i} morphes{run}.sh'.split(),
-                                                             stdout=subprocess.PIPE, 
-                                                             stderr=subprocess.PIPE)
-                                    elif queueType == 'sge':
-                                        process = subprocess.run(f'qsub -t {i} morphes{run}.sh'.split(),
-                                                             stdout=subprocess.PIPE,
-                                                             stderr=subprocess.PIPE)
-                                    if args.verbose:
-                                        print('STDOUT{} '.format(process.stdout.decode('utf8')))
-                                        print('STDERR{} '.format(process.stderr.decode('utf8')))
-                    
-                                    outputString += f'Submitted job {i}\n'
-                                    jobsresub += 1
-                                    os.chdir(cwd)
+                                    jobsforresub.append(i)
                                 else:
                                     jobsfinished += 1
                             else:
 #                               print(f'Simulation not yet done. File dgdl{i}.xvg does not exist.')                            
                                 outputString += '\33[31mSimulation not (yet) finished.\33[0m\n'
-                                
-                                print(f'Submitting job {i} ... ')
-                                exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
-                                os.chdir(exePath)
-                                if queueType == 'slurm':
-                                    process = subprocess.run(f'sbatch --array {i} morphes{run}.sh'.split(),
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE)
-                                elif queueType == 'sge':
-                                    process = subprocess.run(f'qsub -t {i} morphes{run}.sh'.split(),
-                                                        stdout=subprocess.PIPE,
-                                                        stderr=subprocess.PIPE)
-                                
-                                if args.verbose:
-                                   print('STDOUT{} '.format(process.stdout.decode('utf8')))
-                                   print('STDERR{} '.format(process.stderr.decode('utf8')))
+                                jobsforresub.append(i)
+
+                        
+                        print(f'Submitting jobs {jobsforresub} ... ')
+                        exePath = f'{pwf.runPath}/{edge}/{wc}/{state}/'
+                        if len(jobsforresub) > 0:
+                            workflow4_write_scripts.writeScript(pwf, edge, wc, state, ['morphes'], run, queueType)
+                            os.chdir(exePath)
+                            if queueType == 'slurm':
+#                                process = subprocess.run(f'sbatch --array {i} morphes{run}.sh'.split(),
+                                process = subprocess.run(f'sbatch pmx{run}.sh'.split(),
+                                                     stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
+                            elif queueType == 'sge':
+#                            process = subprocess.call([f'sed "s/1-80/"{i}"/g" {runtype}{run}.sh > tmp.sh'], shell=True)
+#                                process = subprocess.run(f'qsub tmp.sh'.split(),
+                                process = subprocess.run(f'qsub pmx{run}.sh'.split(),
+                                                         stdout=subprocess.PIPE,
+                                                         stderr=subprocess.PIPE)
+                            
+                            if args.verbose:
+                                print('STDOUT{} '.format(process.stdout.decode('utf8')))
+                                print('STDERR{} '.format(process.stderr.decode('utf8')))
                                         
-                                outputString += f'Submitted job {i}\n'
-                                jobsresub += 1
-                                os.chdir(cwd)
+                        outputString += f'Submitted jobs\n'
+                        jobsresub += len(jobsforresub)
+                        os.chdir(cwd)
+                        
+                        
                         print(f'Jobs in queue: {jobsrun}')
                         print(f'Jobs resubmitted: {jobsresub}')
                         print(f'Jobs finished: {jobsfinished}')
                         continue
-#                    jobName = 
 
 
                     if os.path.isfile(f'{pwf.runPath}/{edge}/{wc}/{state}/{runtype}{run}/{runtype}{run}.log'):

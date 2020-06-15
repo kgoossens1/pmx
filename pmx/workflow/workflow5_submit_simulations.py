@@ -39,7 +39,7 @@ def submitSimulations(pwf, numsim=None):
                 
                     os.chdir(exePath)
                 
-                    if os.path.isfile(f'pmx{run}.log'):
+                    if os.path.isfile(f'eq{run}/eq{run}.log'):
                         print('Simulation has been run already.\nContinue with next simulation')
                         os.chdir(cwd)
                         continue

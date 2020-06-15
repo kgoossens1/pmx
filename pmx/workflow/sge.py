@@ -23,7 +23,7 @@ def scriptHeader( fname, jobname, simtime=1, simcpu=4):
 #$ -j yes\n\
 #$ -l slot_type=gromacs,affinity_group=default\n\n\
 export LD_LIBRARY_PATH=/shared/app/cuda/10.1/toolkit/lib64/:$LD_LIBRARY_PATH\n\n\
-source /home/dhahn3/bin/gromacs-patched-76/bin/GMXRC\n\n\
+source /home/dhahn3/bin/gromacs-patched/bin/GMXRC\n\n\
 export GMXLIB=/shared/data/gromacs/dhahn3/ffamber/mutff45/\n\n\
 mkdir -p $TMPDIR/$JOB_ID/\n\
 cd $TMPDIR/$JOB_ID/\n\n'
@@ -78,7 +78,7 @@ def scriptArrayjob(fname, gromppline, simpath, jobname, runtype, run, simtime=4,
 #$ -t 1-80\n\
 #$ -l slot_type=gromacs,affinity_group=default\n\n\
 export LD_LIBRARY_PATH=/shared/app/cuda/10.1/toolkit/lib64/:$LD_LIBRARY_PATH\n\n\
-source /home/dhahn3/bin/gromacs-patched-76/bin/GMXRC\n\n\
+source /home/dhahn3/bin/gromacs-patched/bin/GMXRC\n\n\
 export GMXLIB=/shared/data/gromacs/dhahn3/ffamber/mutff45/\n\n\
 \n\
 WORKDIR=$(pwd)\n\
