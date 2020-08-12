@@ -17,7 +17,7 @@ __maintainer__ = "David Hahn"
 __email__ = "davidfriedrichhahn@gmail.com"
 __status__ = "Development"
 
-def submitSimulations(pwf, numsim=None):
+def submitSimulations(pwf, queueType='sge', numsim=None):
     numstarted = 1
     # workpath/[water|complex]/edge* - every edge has its own folder
     waterComplex = ['water','complex']
@@ -49,10 +49,15 @@ def submitSimulations(pwf, numsim=None):
                         os.chdir(cwd)
                         continue
 
+                    if queueType == 'sge':
+                        process = subprocess.run(f'qsub pmx{run}.sh'.split(), 
+                                                 stdout=subprocess.PIPE, 
+                                                 stderr=subprocess.PIPE)
+                    elif queueType == 'slurm':
+                        process = subprocess.run(f'sbatch pmx{run}.sh'.split(), 
+                                                 stdout=subprocess.PIPE, 
+                                                 stderr=subprocess.PIPE)
 
-                    process = subprocess.run(f'qsub pmx{run}.sh'.split(), 
-                                             stdout=subprocess.PIPE, 
-                                             stderr=subprocess.PIPE)
                     
                     if args.verbose:
                         print('STDOUT{} '.format(process.stdout.decode('utf8')))
@@ -153,7 +158,7 @@ if __name__ == '__main__':
             edges[edge] = pwf.edges[edge]
         pwf.edges = edges
 
-    submitSimulations(pwf, numsim=args.numsim)
+    submitSimulations(pwf, queueType=args.queuetype, numsim=args.numsim)
 
                 
 
