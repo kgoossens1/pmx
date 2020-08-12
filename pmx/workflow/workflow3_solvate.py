@@ -168,8 +168,12 @@ def combineProteinLigand(pwf):
         #output
         complexFile = f'{pwf.hybPath}/{edge}/complex/crd/complex.pdb' # complex of the former two structures
 
-        assembleComplex(complexFile, molfiles=[proteinFile, ligandFile, waterFile])
-
+        if os.path.isfile(ligandFile):
+            assembleComplex(complexFile, molfiles=[proteinFile, ligandFile, waterFile])
+        else:
+            print(f"No hybrid structure available. File {ligandFile} missing.")
+            continue
+ 
         # assemble topologies
         proteinTop = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/topol.top' # protein topology
         # output
@@ -289,12 +293,16 @@ def addIonsComplex(pwf):
 
         topology = f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top'
         tprfile = f'{pwf.hybPath}/{edge}/complex/tmp/tpr.tpr'  # temporary tpr file
+        if not os.path.isfile(topology):
+            print(f"Topology file {topfile} does not exist.")
+            continue
 
         # add ions
         for i in pwf.replicates:
             ions = f'{pwf.hybPath}/{edge}/complex/crd/ions{i}.pdb'  # ion file
             topfile = f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol{i}.top'  # top file
             shutil.copy(topology, topfile)
+
             process = subprocess.Popen(['gmx', 'genion',
                                         '-s', tprfile,
                                         '-p', topfile,
