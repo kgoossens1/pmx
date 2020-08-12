@@ -138,19 +138,31 @@ def writeScript(pwf, edge, wc, state, runtype, run, queueType):
             # create array jobscript
             arrayjobname = f'morphes{run}_{pwf.target}_{edge}_{wc}_{state}'
             arrayjobscriptFile = f'{pwf.runPath}/{edge}/{wc}/{state}/morphes{run}.sh'
-            gromppline = f'gmx grompp -p  {topology}\\\n'\
-                         f'           -c  {simPath}/frame$SGE_TASK_ID.gro\\\n'\
-                         f'           -o  tpr.tpr\\\n'\
-                         f'           -f  {mdp}\\\n'\
-                         f'           -po mdout$SGE_TASK_ID.mdp\\\n'\
-                         f'           -maxwarn 2\n'\
 
-            sge.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
+            if queueType == 'sge':
+                gromppline = f'gmx grompp -p  {topology}\\\n'\
+                             f'           -c  {simPath}/frame$SGE_TASK_ID.gro\\\n'\
+                             f'           -o  tpr.tpr\\\n'\
+                             f'           -f  {mdp}\\\n'\
+                             f'           -po mdout$SGE_TASK_ID.mdp\\\n'\
+                             f'           -maxwarn 2\n'
 
-            qsub_exec = shutil.which('qsub')
+                sge.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
+                submit_exec = shutil.which('qsub')
+            elif queueType == 'slurm':
+                gromppline = f'gmx grompp -p  {topology}\\\n'\
+                             f'           -c  {simPath}/frame$SLURM_ARRAY_TASK_ID.gro\\\n'\
+                             f'           -o  tpr.tpr\\\n'\
+                             f'           -f  {mdp}\\\n'\
+                             f'           -po mdout$SLURM_ARRAY_TASK_ID.mdp\\\n'\
+                             f'           -maxwarn 2\n'
+
+                slurm.scriptArrayjob(arrayjobscriptFile, gromppline, simPath, arrayjobname, rt, run)
+                submit_exec = shutil.which('sbatch')
+
             submitPath = os.path.abspath(f'{pwf.runPath}/{edge}/{wc}/{state}/')
             commands = f'cd {submitPath}\n'\
-                       f'{qsub_exec} morphes{run}.sh\n\n'
+                       f'{submit_exec} morphes{run}.sh\n\n'
             if queueType == 'sge':
                 sge.scriptAppend(jobscriptFile, commands)
             elif queueType == 'slurm':
