@@ -13,15 +13,15 @@ import parmed as pmd
 from pmx.workflow import pmxworkflow
 from pmx import forcefield as pmxff
 
-from openforcefield.utils import toolkits
+#from openforcefield.utils import toolkits
 
 ### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
 #toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
 
 ### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
-toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+#toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
 
-toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
+#toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
 
 from openforcefield.topology import Molecule, Topology
 from openforcefield.typing.engines.smirnoff import ForceField
@@ -40,10 +40,12 @@ def ligandToPMD(ligand, pwf):
     ligand_positions = ligand.conformers[0]
 
     # Calculate am1bcc charges
-    try:
-        ligand.compute_partial_charges_am1bcc()
-    except Exception as e:
-        raise Exception('Error in charge calculation for ligand {}: {}'.format(ligand.name, e))
+    print(ligand.partial_charges)
+    if ligand.partial_charges == None:
+        try:
+            ligand.compute_partial_charges_am1bcc()
+        except Exception as e:
+            raise Exception('Error in charge calculation for ligand {}: {}'.format(ligand.name, e))
     # Give all atoms unique names so we can export to GROMACS
     for idx, atom in enumerate(ligand.atoms):
         atom.name = f'{atom.element.symbol}{idx}'
