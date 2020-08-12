@@ -11,16 +11,16 @@ Handles the primary functions
 import os
 import shutil
 
-from openforcefield.utils import toolkits
+# from openforcefield.utils import toolkits
 
-### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
-### Attention: there could be problems in the workflow due to atom order changes, this is related to this issue: https://github.com/openforcefield/openforcefield/issues/475
-#toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+# ### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
+# ### Attention: there could be problems in the workflow due to atom order changes, this is related to this issue: https://github.com/openforcefield/openforcefield/issues/475
+# #toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
 
-### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
-toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+# ### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
+# toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
 
-toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
+# toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
 
 import pmx
 from PLBenchmarks import targets, ligands, edges
@@ -94,7 +94,11 @@ def read_ligands( target ):
     :param target: target name
     :return: py:class`dict` with ligands
     '''
-    return ligands.ligandSet(target).getList()
+    try:
+        return ligands.ligandSet(target).getList()
+    except Exception as e:
+        print(e)
+        return []
 
 def read_edges( target ):
     '''
@@ -102,8 +106,12 @@ def read_edges( target ):
     :param target: target name
     :return: py:class`dict` with edges
     '''
-    return edges.edgeSet(target).getDict()
-
+    print("readedges")
+    try:
+        return edges.edgeSet(target).getDict()
+    except Exception as e:
+        print(e)
+        return []
 
 # a function to prepare a .top file
 def create_top(fname='topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p',
@@ -166,15 +174,18 @@ class pmxvariables:
         # target
         self.target = target
 
+        # path where to find edges, topologies, etc.
+        self.basePath = f'{path}'
+
+        targets.setDataDir(path)
         for t in targets.target_list:
            if t['name'] == self.target:
                 self.targetDir = t['dir']
                 break
         else:
+            self.targetDir = None
             print('Target not found')
 
-        # path where to find edges, topologies, etc.
-        self.basePath = f'{path}'
         self.protPath = f'{self.basePath}/{self.targetDir}/01_protein/'
         self.ligPath = f'{self.basePath}/{self.targetDir}/02_ligands/'
         self.hybPath = f'{self.basePath}/{self.targetDir}/03_hybrid/'
