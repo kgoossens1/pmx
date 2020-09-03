@@ -65,8 +65,7 @@ def atomsToMorph(pwf):
         # make coordinate directory crd
         os.makedirs(f'{pwf.hybPath}/{edge}/water/crd/', exist_ok=True)
 
-        # run atoms_to_morph.py script
-        process = subprocess.Popen(['python3', pwf.scriptpath + '/atoms_to_morph.py',
+        command = ['python3', pwf.scriptpath + '/atoms_to_morph.py',
                                     '-i1', pdb1,
                                     '-i2', pdb2,
                                     '-opdb1', o1,
@@ -74,7 +73,10 @@ def atomsToMorph(pwf):
                                     '-score', score,
                                     '-o', pairs,
                                     '-H2H',
-                                    '-timeout', str(30)],
+                                    '-timeout', str(30)]
+        print(f'COMMAND: {" ".join(command)}')
+        # run atoms_to_morph.py script
+        process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         process.wait()
@@ -112,8 +114,7 @@ def makeHybrid(pwf):
         # make top directory
         os.makedirs(f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/', exist_ok=True)
 
-        # creates hybrid structure/topology
-        process = subprocess.Popen(['python', pwf.scriptpath + '/make_hybrid.py',
+        command = ['python', pwf.scriptpath + '/make_hybrid.py',
                                     '-pairs', pairs,
                                     '-l1', l1,
                                     '-l2', l2,
@@ -124,7 +125,11 @@ def makeHybrid(pwf):
                                     '-ob', opdbB,
                                     '-ffitp', offitp,
                                     '-log', olog,
-                                    '-scDUMm', str(0.001)],
+                                    '-scDUMm', str(0.001)]
+
+        print(f'COMMAND: {" ".join(command)}')
+        # creates hybrid structure/topology
+        process = subprocess.Popen(command, 
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         process.wait()
@@ -153,9 +158,12 @@ def oneffFile(pwf):
         # output
         ffout = f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/ffMOL.itp'  # atomtypes out
 
-        process = subprocess.Popen(['python', pwf.scriptpath + '/one_ff_file.py',
+        command = ['python', pwf.scriptpath + '/one_ff_file.py',
                                     '-ffitp', ff1, ff2, ffmerged,
-                                    '-ffitp_out', ffout],
+                                    '-ffitp_out', ffout]
+
+        print(f'COMMAND: {" ".join(command)}')
+        process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         process.wait()

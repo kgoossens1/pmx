@@ -164,7 +164,7 @@ def combineProteinLigand(pwf):
         # input
         proteinFile = f'{pwf.protPath}/crd/protein.pdb'  # input protein structure with ions, cofactors and crystal waters
         ligandFile = f'{pwf.hybPath}/{edge}/water/crd/mergedA.pdb'  # input ligand structure
-        waterFile = f'{pwf.protPath}/crd/water.pdb'  # input protein structure with ions, cofactors and crystal waters
+        waterFile = f'{pwf.protPath}/crd/cofactors_crystalwater.pdb'  # input protein structure with ions, cofactors and crystal waters
         #output
         complexFile = f'{pwf.hybPath}/{edge}/complex/crd/complex.pdb' # complex of the former two structures
 
@@ -175,7 +175,8 @@ def combineProteinLigand(pwf):
             continue
  
         # assemble topologies
-        proteinTop = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/topol.top' # protein topology
+        proteinTop = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/protein.top' # protein topol        
+        cofactors_crystalwaterTop = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/cofactors_crystalwater.top' # protein topology
         # output
         complexTop = f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top'  # complex topology
 
@@ -190,16 +191,27 @@ def combineProteinLigand(pwf):
         # molecules to be included
         molecules = []
         # protein system parts
-        fp = open(proteinTop, 'r')
-        lines = fp.readlines()
-        for i, l in enumerate(lines):
-            if l.startswith('[ molecules ]'):
-                break
-        for l in lines[i+1:]:
-            molecules.append(l.split())
+        with open(proteinTop, 'r') as fp:
+            lines = fp.readlines()
+            for i, l in enumerate(lines):
+                if l.startswith('[ molecules ]'):
+                    break
+            for l in lines[i+1:]:
+                if l.startswith(';'):
+                    continue
+                molecules.append(l.split())
         # add ligand molecule
-        molecules.insert(1, ['MOL', 1])
-        print(molecules)
+        molecules.append(['MOL', 1])
+        # add cofactor and water system parts
+        with open(cofactors_crystalwaterTop, 'r') as fp:
+            lines = fp.readlines()
+            for i, l in enumerate(lines):
+                if l.startswith('[ molecules ]'):
+                    break
+            for l in lines[i+1:]:
+                if l.startswith(';'):
+                    continue
+                molecules.append(l.split())
 
         pmxworkflow.create_top(fname=f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p',
                    itp=includes, mols=molecules,
