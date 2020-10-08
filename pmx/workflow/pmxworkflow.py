@@ -95,7 +95,7 @@ def read_ligands( target ):
     :return: py:class`dict` with ligands
     '''
     try:
-        return ligands.ligandSet(target).getList()
+        return ligands.LigandSet(target).get_list()
     except Exception as e:
         print(e)
         return []
@@ -106,9 +106,8 @@ def read_edges( target ):
     :param target: target name
     :return: py:class`dict` with edges
     '''
-    print("readedges")
     try:
-        return edges.edgeSet(target).getDict()
+        return edges.EdgeSet(target).get_dict()
     except Exception as e:
         print(e)
         return []
@@ -177,10 +176,10 @@ class pmxvariables:
         # path where to find edges, topologies, etc.
         self.basePath = f'{path}'
 
-        targets.setDataDir(path)
-        for t in targets.target_list:
-           if t['name'] == self.target:
-                self.targetDir = t['dir']
+        targets.set_data_dir(path)
+        for t in targets.target_dict:
+           if t == self.target:
+                self.targetDir = targets.target_dict[t]['dir']
                 break
         else:
             self.targetDir = None
@@ -214,7 +213,7 @@ class pmxvariables:
 
 
 def step1_parameterize_ligands(target, forcefield='openff-1.0.0', verbose=False):
-    ligSet = ligands.ligandSet(target).getDF(columns=['name', 'smiles', 'docked'])
+    ligSet = ligands.LigandSet(target).get_dataframe(columns=['name', 'smiles', 'docked'])
     for index, lig in ligSet.iterrows():
         printInfo(runtype='para', run=0, target=target, edge=lig['name'].values[0], wc='', state='')
     return
