@@ -46,7 +46,7 @@ def read_neq_results( fname ):
 def output_textfile(pwf, df, fname):
     fp = open(fname, 'w')
     fp.write('#%6s  %6s  %6s\n' % ('1_edge', '2_ddg', '3_ddg_err'))
-    fp.write('#all values in kJ/mol\n')
+    fp.write('#all values in kcal/mol\n')
 
     for edge, ligs in pwf.edges.items():
         val = df.loc[f'{edge}_ddg', 'val']
