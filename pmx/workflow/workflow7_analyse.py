@@ -188,6 +188,108 @@ def analyzeSimulations(pwf):
 
     newdf.to_csv(f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.csv', float_format='%10.2f')
 
+def unite_results(pwf):
+    bootnum = 1000
+    ######## read into a data frame #########
+    df = pd.DataFrame()
+    arrays = [['water', 'complex', 'ddg'] * 3,
+              [int(i / 3) + 1 for i in range(9)],
+              [''] * 9]
+    arrays = [[] * 9] * 3
+    tuples = list(zip(*arrays))
+
+    index = pd.MultiIndex.from_tuples(tuples, names=['leg', 'repeat', ''])
+    newdf = pd.DataFrame(columns=index)
+
+    # workpath/[water|complex]/edge* - every edge has its own folder
+    waterComplex = ['water','complex']
+    # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
+    states = ['stateA','stateB']
+
+    for edge in pwf.edges.keys():
+        pmxworkflow.printInfo(runtype='Analyse', run='', target=pwf.target, edge=edge, wc='', state='')
+        for wc in waterComplex:
+            print(f'    - {wc}')
+            for run in pwf.replicates:
+                # output files
+                result = f'{pwf.runPath}/{edge}/{wc}/analyse{run}/results.txt'
+                if not os.path.exists(result):
+                    print(f"Results file {result} does not exist.")
+
+                # --------------------------------
+                # Processing of the results: calculate ddG, compute means, output
+                # ---------------------------------
+
+                print(result)
+                foo = read_neq_results( result )
+                if len(foo) > 1:
+                    df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
+                    df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
+                    df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
+                    df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
+                    for t in ['val', 'err', 'aerr', 'conv']:
+                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
+                else:
+                    df.loc[f'{edge}_{wc}{run}','val'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','err'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','aerr'] = np.nan
+                    df.loc[f'{edge}_{wc}{run}','conv'] = np.nan
+                    for t in ['val', 'err', 'aerr', 'conv']:
+                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
+                    print('Results could not be read')
+
+
+        vals = []
+        errs = []
+        aerrs = []
+        for run in pwf.replicates:
+            ##### calculate ddg #####
+            ddg = df.loc[f'{edge}_complex{run}','val'] - df.loc[f'{edge}_water{run}','val']
+            err = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','err'],2.0) +
+                           np.power(df.loc[f'{edge}_water{run}','err'],2.0) )
+            aerr = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','aerr'],2.0) +
+                            np.power(df.loc[f'{edge}_water{run}','aerr'],2.0) )
+            print(ddg, err, aerr)
+            df.loc[f'{edge}_ddg{run}','val'] = ddg
+            df.loc[f'{edge}_ddg{run}','err'] = err
+            df.loc[f'{edge}_ddg{run}','aerr'] = aerr
+            newdf.loc[f'{edge}', ('ddg', run, 'val')] = ddg
+            newdf.loc[f'{edge}', ('ddg', run, 'err')] = err
+            newdf.loc[f'{edge}', ('ddg', run, 'aerr')] = aerr
+            vals.append(ddg)
+            errs.append(err)
+            aerrs.append(aerr)
+
+
+        ###### calculate mean dg with err ######
+        # mean ddg
+        mean = np.average(vals)
+        df.loc[f'{edge}_ddg', 'val'] = mean
+
+        # error
+        # 1) create three distributions
+        distribs = []
+        for v, e in zip(vals, errs):
+            distribs.append(np.random.normal(v, e, size=bootnum))
+        if len(distribs) > 1:
+            distr = np.vstack(distribs)
+            # 2) calculate stderrs
+            stderr = np.mean(np.sqrt(np.var(distr, ddof=1, axis=0) / np.float(len(distribs))))
+            df.loc[f'{edge}_ddg', 'err'] = stderr
+            print(mean, stderr)
+        else:
+            stderr = errs[0]
+            df.loc[f'{edge}_ddg','err'] = stderr
+
+        for t in ['val', 'err', 'aerr']:
+            newdf.loc[f'{edge}', ('ddg_mean', '-', t)] = df.loc[f'{edge}_ddg', t]
+
+    ###### output ######
+    os.makedirs(f'{pwf.runPath}/{pwf.forcefield}/results', exist_ok=True)
+    output_textfile( pwf,  df, f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.dat' )
+
+    newdf.to_csv(f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.csv', float_format='%10.2f')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -232,6 +334,13 @@ if __name__ == '__main__':
                         type=str,
                         default=['all'],
                         help='Either "all" or a list of edges to be calculated.')
+    parser.add_argument('-c',
+                        '--combine',
+                        type=bool,
+                        nargs='?',
+                        const=True,
+                        default=False,
+                        help='Just combine data without calculation of work values.')
     parser.add_argument('-v',
                         '--verbose',
                         type=bool,
@@ -263,4 +372,7 @@ if __name__ == '__main__':
             edges[edge] = pwf.edges[edge]
         pwf.edges = edges
 
-    analyzeSimulations(pwf)
+    if not args.combine:
+        analyzeSimulations(pwf)
+    else:
+        unite_results(pwf)

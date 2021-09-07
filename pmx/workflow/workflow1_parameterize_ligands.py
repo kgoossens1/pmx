@@ -189,7 +189,7 @@ if __name__ == '__main__':
                         metavar='FORCEFIELD',
                         type=str,
                         default='smirnoff99Frosst-1.1.0.offxml',
-                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
+#                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
                         help='The force field used.')
     parser.add_argument('-p',
                         '--path',
