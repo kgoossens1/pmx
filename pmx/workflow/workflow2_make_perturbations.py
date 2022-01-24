@@ -69,10 +69,9 @@ def atomsToMorph(pwf):
         process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -133,10 +132,9 @@ def makeHybrid(pwf):
         process = subprocess.Popen(command, 
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -167,10 +165,9 @@ def oneffFile(pwf):
         process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 

@@ -121,7 +121,6 @@ def analyzeSimulations(pwf):
     with Pool(16) as p:
         p.map(run_commands, commands)
 
-
 def unite_results(pwf):
     bootnum = 1000
     ######## read into a data frame #########
