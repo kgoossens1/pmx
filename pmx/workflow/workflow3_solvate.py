@@ -49,10 +49,9 @@ def solvateLigand(pwf):
                                     '-d', str(1.5)],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -67,10 +66,9 @@ def solvateLigand(pwf):
                                     '-p', topology],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -82,16 +80,16 @@ def solvateLigand(pwf):
         process = subprocess.Popen(['gmx', 'grompp',
                                     '-p', topology,
                                     '-c', water,
+                                    '-r', water,
                                     '-o', tprfile,
                                     '-f', mdpemA,
                                     '-po', mdout,
                                     '-maxwarn', str(2)],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -125,9 +123,9 @@ def addIonsLigand(pwf):
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
             process.stdin.write('SOL'.encode())
+            out = process.communicate()
 
             if pwf.verbose:
-                out = process.communicate()
                 print('STDERR{} '.format(out[1].decode("utf-8")))
                 print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -185,7 +183,7 @@ def combineProteinLigand(pwf):
         # merged molecules itp
         includes = ['ffMOL.itp', 'merged.itp']
         # protein
-        includes += list(filter(lambda x: x.endswith('.itp'), os.listdir(f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/')))
+        includes += list(filter(lambda x: x.endswith('.itp') and not x.startswith('posre'), os.listdir(f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/')))
 
 
         # molecules to be included
@@ -244,10 +242,9 @@ def solvateComplex(pwf):
                                     '-d', str(1.5)],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDOUT{} '.format(out[0].decode("utf-8")))
             print('STDERR{} '.format(out[1].decode("utf-8")))
 
@@ -261,10 +258,9 @@ def solvateComplex(pwf):
                                     '-p', topology],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDOUT{} '.format(out[0].decode("utf-8")))
             print('STDERR{} '.format(out[1].decode("utf-8")))
 
@@ -275,16 +271,16 @@ def solvateComplex(pwf):
         process = subprocess.Popen(['gmx', 'grompp',
                                     '-p', topology,
                                     '-c', water,
+                                    '-r', water,
                                     '-o', tprfile,
                                     '-f', mdpemA,
                                     '-po', mdout,
                                     '-maxwarn', str(3)],
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDOUT{} '.format(out[0].decode("utf-8")))
             print('STDERR{} '.format(out[1].decode("utf-8")))
 
@@ -328,8 +324,9 @@ def addIonsComplex(pwf):
                                        stderr=subprocess.PIPE)
             process.stdin.write('SOL'.encode())
 
+            out = process.communicate()
+
             if pwf.verbose:
-                out = process.communicate()
                 print('STDOUT{} '.format(out[0].decode("utf-8")))
                 print('STDERR{} '.format(out[1].decode("utf-8")))
 
@@ -369,7 +366,6 @@ if __name__ == '__main__':
                         metavar='FORCEFIELD',
                         type=str,
                         default='smirnoff99Frosst-1.1.0.offxml',
-                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
                         help='The force field used.')
     parser.add_argument('-p',
                         '--path',

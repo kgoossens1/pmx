@@ -79,10 +79,9 @@ def atomsToMorph(pwf):
         process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -97,7 +96,8 @@ def makeHybrid(pwf):
         print(f'    - {edge}')
         lig1 = item[0]
         lig2 = item[1]
-
+        # make temporary directory tmp
+        os.makedirs(f'{pwf.hybPath}/{edge}/water/tmp/', exist_ok=True)
         # input
         l1 = f'{pwf.hybPath}/{edge}/water/tmp/out_pdb1.pdb'  # structure lig1; temporary file
         l2 = f'{pwf.hybPath}/{edge}/water/tmp/out_pdb2.pdb'  # structure lig2; temporary file
@@ -110,6 +110,16 @@ def makeHybrid(pwf):
         oitp = f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/merged.itp' # hybrid topology
         offitp = f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/ffmerged.itp'  # force field parameters for dummies
         olog = f'{pwf.hybPath}/{edge}/water/tmp/hybrid.log'  # output log
+
+
+        if not os.path.exists(l1):
+            ligPath1 = f'{pwf.ligPath}/{lig1}/crd/{lig1}.sdf'
+            ligand = Molecule.from_file(f'{ligPath1}', allow_undefined_stereo=True)
+            ligand.to_file(l1, 'pdb')
+        if not os.path.exists(l2):
+            ligPath2 = f'{pwf.ligPath}/{lig2}/crd/{lig2}.sdf'
+            ligand = Molecule.from_file(f'{ligPath2}', allow_undefined_stereo=True)
+            ligand.to_file(l2, 'pdb')
 
         # make top directory
         os.makedirs(f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/', exist_ok=True)
@@ -132,10 +142,9 @@ def makeHybrid(pwf):
         process = subprocess.Popen(command, 
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -166,10 +175,9 @@ def oneffFile(pwf):
         process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        process.wait()
+        out = process.communicate()
 
         if pwf.verbose:
-            out = process.communicate()
             print('STDERR{} '.format(out[1].decode("utf-8")))
             print('STDOUT{} '.format(out[0].decode("utf-8")))
 
@@ -203,7 +211,7 @@ if __name__ == '__main__':
                         metavar='FORCEFIELD',
                         type=str,
                         default='smirnoff99Frosst-1.1.0.offxml',
-                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
+#                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
                         help='The force field used.')
     parser.add_argument('-p',
                         '--path',

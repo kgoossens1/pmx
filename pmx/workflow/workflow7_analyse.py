@@ -107,10 +107,9 @@ def analyzeSimulations(pwf):
                 process = subprocess.Popen(cmdline.split(),
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
-                process.wait()
+                out = process.communicate()
 
                 if pwf.verbose:
-                    out = process.communicate()
                     print('STDOUT{} '.format(out[0].decode("utf-8")))
                     print('STDERR{} '.format(out[1].decode("utf-8")))
 

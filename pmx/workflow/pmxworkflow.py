@@ -140,7 +140,10 @@ def create_top(fname='topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p'
         for topfile in itp:
             for toppath in toppaths:
                 if os.path.isfile(toppath + '/' + topfile):
-                    shutil.copy(toppath + '/' + topfile, destination)
+                    try:
+                        shutil.copy(toppath + '/' + topfile, destination)
+                    except shutil.SameFileError:
+                        pass
                     break
 
 
