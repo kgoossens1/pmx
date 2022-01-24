@@ -13,18 +13,19 @@ import parmed as pmd
 from pmx.workflow import pmxworkflow
 from pmx import forcefield as pmxff
 
-#from openforcefield.utils import toolkits
+from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
-### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
-#toolkit_precedence = [toolkits.OpenEyeToolkitWrapper, toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
-### Non-OpenEye version: uncomment the following if you want to use the rdkit and ambertools
-#toolkit_precedence = [toolkits.RDKitToolkitWrapper, toolkits.AmberToolsToolkitWrapper]
+from openff.toolkit.topology import Molecule, Topology
+from openff.toolkit.typing.engines.smirnoff import ForceField
 
-#toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
-
-from openforcefield.topology import Molecule, Topology
-from openforcefield.typing.engines.smirnoff import ForceField
+from multiprocessing import Pool
 
 __author__ = "David Hahn and Vytas Gapsys"
 __copyright__ = "Copyright (c) 2020 Open Force Field Consortium and de Groot Lab"
@@ -121,60 +122,65 @@ def write_posre(itp, fname, fc=1000):
         print("%d   1    %d   %d    %d" % (i + 1, fc, fc, fc), file=fp)
     fp.close()
 
+def calculate_parameters(lig, pwf):
+    print(f'    - {lig}')
+
+    # make topology directory
+    os.makedirs(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/', exist_ok=True)
+    
+    # ligand sdf file
+    ligFile = f'{pwf.ligPath}/{lig}/crd/{lig}.sdf'
+
+    if os.path.isfile(f'{ligFile}'):
+        ligand = Molecule.from_file(f'{ligFile}', allow_undefined_stereo=True)
+    elif os.path.isfile(f'{pwf.ligPath}/{lig}/crd/{lig}.pdb'):
+        # Try to read in PDB file instead of a SDF, only works with OpenEye
+        warnings.warn('    SDF file not available. Trying to read in PDB file and automatically convert it to SDF. '
+                      'This might lead to wrong bond orders.')
+        ligand = Molecule.from_file(
+            f'{pwf.ligPath}/{lig}/crd/{lig}.pdb',
+            allow_undefined_stereo=True)
+        # save as sdf file
+        # ATTENTION: automatic conversion to SDF
+        ligand.name = lig
+        ligand.to_file(f'{ligFile}', 'sdf')
+    else:
+        warnings.warn(f'      File not found. Ligand {lig} cannot be read in. Continuing with next ligand.')
+        return
+
+    try:
+        pmd_structure, ligand_topology, ligand_system, ligand_positions = ligandToPMD(ligand, pwf)
+    except Exception as e:
+        print('      ' + str(e))
+        return
+
+    # Export GROMACS files.
+    pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.top', overwrite=True)
+    pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.gro', overwrite=True, precision=8)
+
+    # Create GROMACS ITP file
+    itp = pmxff.read_gaff_top(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.top')
+    itp.set_name('MOL')
+    change_atomtypes(itp, lig)
+    set_charge_to_zero(itp)
+    
+    itp.write(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.itp')
+    write_ff(itp.atomtypes, f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/ff{lig}.itp')
+    write_posre(itp, f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/posre_{lig}.itp')
+
+    # Export AMBER files.
+    pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.prmtop', overwrite=True)
+    pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.inpcrd', overwrite=True)
+
 def coordToTopo(pwf):
     pmxworkflow.printInfo(runtype='Parameterize Ligands',
                           run='',
                           target=pwf.target,
                           edge='', wc='', state='')
-    for index, lig in enumerate(pwf.ligands):
-        print(f'    - {lig}')
 
-        # make topology directory
-        os.makedirs(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/', exist_ok=True)
+    with Pool(4) as p:
+        p.starmap(calculate_parameters, [(lig, pwf) for lig in pwf.ligands])
 
-        # ligand sdf file
-        ligFile = f'{pwf.ligPath}/{lig}/crd/{lig}.sdf'
-
-        if os.path.isfile(f'{ligFile}'):
-            ligand = Molecule.from_file(f'{ligFile}', allow_undefined_stereo=True)
-        elif os.path.isfile(f'{pwf.ligPath}/{lig}/crd/{lig}.pdb'):
-            # Try to read in PDB file instead of a SDF, only works with OpenEye
-            warnings.warn('    SDF file not available. Trying to read in PDB file and automatically convert it to SDF. '
-                          'This might lead to wrong bond orders.')
-            ligand = Molecule.from_file(
-                f'{pwf.ligPath}/{lig}/crd/{lig}.pdb',
-                allow_undefined_stereo=True)
-            # save as sdf file
-            # ATTENTION: automatic conversion to SDF
-            ligand.name = lig
-            ligand.to_file(f'{ligFile}', 'sdf')
-        else:
-            warnings.warn(f'      File not found. Ligand {lig} cannot be read in. Continuing with next ligand.')
-            continue
-
-        try:
-            pmd_structure, ligand_topology, ligand_system, ligand_positions = ligandToPMD(ligand, pwf)
-        except Exception as e:
-            print('      ' + str(e))
-            continue
-
-        # Export GROMACS files.
-        pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.top', overwrite=True)
-        pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.gro', overwrite=True, precision=8)
-
-        # Create GROMACS ITP file
-        itp = pmxff.read_gaff_top(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.top')
-        itp.set_name('MOL')
-        change_atomtypes(itp, lig)
-        set_charge_to_zero(itp)
-
-        itp.write(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.itp')
-        write_ff(itp.atomtypes, f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/ff{lig}.itp')
-        write_posre(itp, f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/posre_{lig}.itp')
-
-        # Export AMBER files.
-        pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.prmtop', overwrite=True)
-        pmd_structure.save(f'{pwf.ligPath}/{lig}/top/{pwf.forcefield}/{lig}.inpcrd', overwrite=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -28,8 +28,8 @@ def solvateLigand(pwf):
                           target=pwf.target,
                           edge='', wc='', state='')
     for edge, item in pwf.edges.items():
-        lig1 = item[0]
-        lig2 = item[1]
+        lig1 = item['ligand_a']
+        lig2 = item['ligand_b']
         # make temporary directory tmp
         os.makedirs(f'{pwf.hybPath}/{edge}/water/tmp/', exist_ok=True)
 
@@ -180,12 +180,40 @@ def combineProteinLigand(pwf):
         # output
         complexTop = f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top'  # complex topology
 
+        if os.path.exists(f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/ffcofactors_crystalwater.itp'):
+            # generate oneff_fuke
+            # input
+            ff1 = f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/ffMOL.itp'
+            ff2 = f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/ffcofactors_crystalwater.itp'
+            # output
+            ffout = f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/ffcomplex.itp'
 
-        # included itp files
-        # merged molecules itp
-        includes = ['ffMOL.itp', 'merged.itp']
+
+            command = ['python', pwf.scriptpath + '/one_ff_file.py',
+                       '-ffitp', ff1, ff2,
+                       '-ffitp_out', ffout]
+
+            print(f'COMMAND: {" ".join(command)}')
+            process = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+            process.wait()
+
+            if pwf.verbose:
+                out = process.communicate()
+                print('STDERR{} '.format(out[1].decode("utf-8")))
+                print('STDOUT{} '.format(out[0].decode("utf-8")))
+
+            # included itp files
+            # merged molecules itp
+            includes = ['ffcomplex.itp', 'merged.itp']
+        else:
+            # included itp files
+            # merged molecules itp
+            includes = ['ffMOL.itp', 'merged.itp']
+
         # protein
-        includes += list(filter(lambda x: x.endswith('.itp'), os.listdir(f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/')))
+        includes += list(filter(lambda x: x.endswith('.itp') and not  x.startswith('ff'), os.listdir(f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/')))
 
 
         # molecules to be included
@@ -215,7 +243,7 @@ def combineProteinLigand(pwf):
 
         pmxworkflow.create_top(fname=f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p',
                    itp=includes, mols=molecules,
-                   destination=f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/', toppaths=[f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/', f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/'])
+                   destination=f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/', toppaths=[f'{pwf.protPath}/top/amber99sb-star-ildn-mut.ff/', f'{pwf.hybPath}/{edge}/water/top/{pwf.forcefield}/', f'{pwf.hybPath}/{edge}/complex/top/{pwf.forcefield}/'])
 
 ################################################
 # prepare water boxes for complex simulations  #
@@ -369,7 +397,6 @@ if __name__ == '__main__':
                         metavar='FORCEFIELD',
                         type=str,
                         default='smirnoff99Frosst-1.1.0.offxml',
-                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
                         help='The force field used.')
     parser.add_argument('-p',
                         '--path',

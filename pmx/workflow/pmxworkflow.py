@@ -11,6 +11,15 @@ Handles the primary functions
 import os
 import shutil
 
+from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
+
 # from openforcefield.utils import toolkits
 
 # ### OpenEye version: uncomment the following if you have and if you want to use the OpenEye toolkit, then RDKit and Ambertools toolkits
@@ -23,7 +32,7 @@ import shutil
 # toolkits.GLOBAL_TOOLKIT_REGISTRY = toolkits.ToolkitRegistry(toolkit_precedence=toolkit_precedence)
 
 import pmx
-from PLBenchmarks import targets, ligands, edges
+from plbenchmark import targets, ligands, edges
 
 
 __author__ = "David Hahn and Vytas Gapsys"
@@ -140,7 +149,10 @@ def create_top(fname='topol.top', ff='amber99sb-star-ildn-mut.ff', water='tip3p'
         for topfile in itp:
             for toppath in toppaths:
                 if os.path.isfile(toppath + '/' + topfile):
-                    shutil.copy(toppath + '/' + topfile, destination)
+                    try:
+                        shutil.copy(toppath + '/' + topfile, destination)
+                    except shutil.SameFileError:
+                        pass
                     break
 
 

@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from pmx.workflow import pmxworkflow
 
+from multiprocessing import Pool
+
 __author__ = "David Hahn and Vytas Gapsys"
 __copyright__ = "Copyright (c) 2020 Open Force Field Consortium and de Groot Lab"
 __credits__ = []
@@ -56,6 +58,16 @@ def output_textfile(pwf, df, fname):
 
     fp.close()
 
+def run_commands(cmdline):
+    process = subprocess.Popen(cmdline,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    process.wait()
+    
+    out = process.communicate()
+    print('STDOUT{} '.format(out[0].decode("utf-8")))
+    print('STDERR{} '.format(out[1].decode("utf-8")))
+    return
 
 def analyzeSimulations(pwf):
     bootnum = 1000
@@ -75,6 +87,7 @@ def analyzeSimulations(pwf):
     # workpath/[water|complex]/edge*/state[A|B] - two states will be considered for every edge
     states = ['stateA','stateB']
 
+    commands = []
     for edge in pwf.edges.keys():
         pmxworkflow.printInfo(runtype='Analyse', run='', target=pwf.target, edge=edge, wc='', state='')
         for wc in waterComplex:
@@ -102,91 +115,12 @@ def analyzeSimulations(pwf):
                 f'-m bar '\
                 f'--no_ks '\
                 f'--unit kcal'
-
+                
+                commands.append(cmdline.split())
 #                print(cmdline)
-                process = subprocess.Popen(cmdline.split(),
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE)
-                process.wait()
+    with Pool(16) as p:
+        p.map(run_commands, commands)
 
-                if pwf.verbose:
-                    out = process.communicate()
-                    print('STDOUT{} '.format(out[0].decode("utf-8")))
-                    print('STDERR{} '.format(out[1].decode("utf-8")))
-
-                # --------------------------------
-                # Processing of the results: calculate ddG, compute means, output
-                # ---------------------------------
-
-                print(result)
-                foo = read_neq_results( result )
-                if len(foo) > 1:
-                    df.loc[f'{edge}_{wc}{run}','val'] = foo[0]
-                    df.loc[f'{edge}_{wc}{run}','err'] = foo[2]
-                    df.loc[f'{edge}_{wc}{run}','aerr'] = foo[1]
-                    df.loc[f'{edge}_{wc}{run}','conv'] = foo[3]
-                    for t in ['val', 'err', 'aerr', 'conv']:
-                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
-                else:
-                    df.loc[f'{edge}_{wc}{run}','val'] = np.nan
-                    df.loc[f'{edge}_{wc}{run}','err'] = np.nan
-                    df.loc[f'{edge}_{wc}{run}','aerr'] = np.nan
-                    df.loc[f'{edge}_{wc}{run}','conv'] = np.nan
-                    for t in ['val', 'err', 'aerr', 'conv']:
-                        newdf.loc[f'{edge}', (wc, run, t)] = df.loc[f'{edge}_{wc}{run}', t]
-                    print('Results could not be read')
-
-
-        vals = []
-        errs = []
-        aerrs = []
-        for run in pwf.replicates:
-            ##### calculate ddg #####
-            ddg = df.loc[f'{edge}_complex{run}','val'] - df.loc[f'{edge}_water{run}','val']
-            err = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','err'],2.0) +
-                           np.power(df.loc[f'{edge}_water{run}','err'],2.0) )
-            aerr = np.sqrt( np.power(df.loc[f'{edge}_complex{run}','aerr'],2.0) +
-                            np.power(df.loc[f'{edge}_water{run}','aerr'],2.0) )
-            print(ddg, err, aerr)
-            df.loc[f'{edge}_ddg{run}','val'] = ddg
-            df.loc[f'{edge}_ddg{run}','err'] = err
-            df.loc[f'{edge}_ddg{run}','aerr'] = aerr
-            newdf.loc[f'{edge}', ('ddg', run, 'val')] = ddg
-            newdf.loc[f'{edge}', ('ddg', run, 'err')] = err
-            newdf.loc[f'{edge}', ('ddg', run, 'aerr')] = aerr
-            vals.append(ddg)
-            errs.append(err)
-            aerrs.append(aerr)
-
-
-        ###### calculate mean dg with err ######
-        # mean ddg
-        mean = np.average(vals)
-        df.loc[f'{edge}_ddg', 'val'] = mean
-
-        # error
-        # 1) create three distributions
-        distribs = []
-        for v, e in zip(vals, errs):
-            distribs.append(np.random.normal(v, e, size=bootnum))
-        if len(distribs) > 1:
-            distr = np.vstack(distribs)
-            # 2) calculate stderrs
-            stderr = np.mean(np.sqrt(np.var(distr, ddof=1, axis=0) / np.float(len(distribs))))
-            df.loc[f'{edge}_ddg', 'err'] = stderr
-            print(mean, stderr)
-        else:
-            stderr = errs[0]
-            df.loc[f'{edge}_ddg','err'] = stderr
-
-        for t in ['val', 'err', 'aerr']:
-            newdf.loc[f'{edge}', ('ddg_mean', '-', t)] = df.loc[f'{edge}_ddg', t]
-
-    ###### output ######
-    os.makedirs(f'{pwf.runPath}/{pwf.forcefield}/results', exist_ok=True)
-    output_textfile( pwf,  df, f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.dat' )
-
-    newdf.to_csv(f'{pwf.runPath}/{pwf.forcefield}/results/{pwf.target}_{pwf.forcefield}.csv', float_format='%10.2f')
 
 def unite_results(pwf):
     bootnum = 1000
@@ -312,7 +246,6 @@ if __name__ == '__main__':
                         metavar='FORCEFIELD',
                         type=str,
                         default='smirnoff99Frosst-1.1.0.offxml',
-                        choices=['smirnoff99Frosst-1.1.0.offxml', 'openff-1.0.0.offxml', 'openff-1.2.0.offxml', 'gaff2'],
                         help='The force field used.')
     parser.add_argument('-p',
                         '--path',
@@ -374,5 +307,5 @@ if __name__ == '__main__':
 
     if not args.combine:
         analyzeSimulations(pwf)
-    else:
-        unite_results(pwf)
+        
+    unite_results(pwf)
