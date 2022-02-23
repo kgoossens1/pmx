@@ -835,7 +835,8 @@ X   X   CW  H4       4      180.00     4.60240     2
 X   X   N2  H        4      180.00     4.18400     2
 X   X   NA  H        4      180.00     4.18400     2
 X   X   N   H        4      180.00     4.18400     2
-
+NA  CW  CC  CT       4      180.00     4.60240     2     ;;; HID force field added
+NA  CV  CC  CT       4      180.00     4.60240     2     ;;; HID force field added
 
 [ dihedraltypes ]
 ;i   j   k   l     func
