@@ -4,8 +4,8 @@
 This script is used to prepare the protein and ligand files, directories, and the 
 necessary yaml files of target, ligands and edges for free energy calculations
 following the pmx workflow.
-It is possible to activate file conversion from a schrodinger project (flag 2) and 
-to create the corresponding directories and yaml files (flag 1). Required input is 
+It is possible to activate file conversion from a schrodinger project (convert) and 
+to create the corresponding directories and yaml files (prep). Required input is 
 the target name and the directory in which to create the output directory. Optionally,
 you can provide names of properties that are stored for target and ligands to be
 extracted from the input files. By default, all properties are extracted.
@@ -21,6 +21,7 @@ import subprocess
 import sys
 
 import yaml
+from rdkit import Chem
 
 __author__ = "Kenneth Goossens"
 __version__ = "1.0.0"
@@ -43,6 +44,28 @@ def convert_schrod(target_name, directory, flag2):
         process = subprocess.Popen(command, stdout=subprocess.PIPE).stdout.read()
     return
 
+def ligand_files_setup(target_name, directory, flag3):
+    if not flag3:
+        return
+    print("ligand file setup invoked.")
+    dict_file = os.path.join(directory, "FEP_workflow_pmx/targets.yml")
+    with open(dict_file, "r") as f:
+        target_dict = yaml.safe_load(f)
+    target_dir = target_dict[target_name]["dir"]
+    path_to_ligands = os.path.join(directory, "FEP_workflow_pmx", target_dir, "02_ligands/")
+    mols = Chem.SDMolSupplier(f"{target_name}.sdf")
+    for count, mol in enumerate(mols):
+        if count == 0:
+            continue 
+        name = mol.GetProp("_Name")
+        writer = Chem.SDWriter(f"{name}.sdf")
+        writer.write(mol)
+        mol_path = os.path.join(path_to_ligands, name, "crd")
+        if os.path.isfile(mol_path):
+            print(mol_path, "is a file")
+        os.makedirs(mol_path, exist_ok=True)
+        os.replace(f"{name}.sdf", os.path.join(mol_path, f"{name}.sdf"))
+    return
 
 
 def main(target_name, directory, flag1, *props):
@@ -75,8 +98,8 @@ def main(target_name, directory, flag1, *props):
         for line in file:
             if target_name + ":" in line:
                 print(f"{target_name} already exists in the dataset. No new instance was created.")
-        else:
-            file.write(yaml.dump(target_dict)) #prints date with quotation marks
+            else:
+                file.write(yaml.dump(target_dict)) #prints date with quotation marks
 
     """Edges.yml"""
 
@@ -203,16 +226,22 @@ if __name__ == '__main__':
                         nargs="+",
                         help="Properties to extract from the ligands in the SDF file.",
                         metavar="LIGAND_PROPERTIES")
-    parser.add_argument("-flag1",
+    parser.add_argument("-prep",
                         dest="flag1",
                         default=False,
                         action='store_true',
-                        help="If true, main function will run.",)
-    parser.add_argument("-flag2",
+                        help="If true, folder preparation function will run.",)
+    parser.add_argument("-convert",
                         dest="flag2",
                         default=False,
                         action='store_true',
                         help="If true, schrodinger conversion function will run.")
+    parser.add_argument("-lig_setup",
+                        dest="flag3",
+                        default=False,
+                        action='store_true',
+                        help=("If true, function to extract and move ligands "
+                              "from sdf file will run."))
 
     args = parser.parse_args()
     
@@ -220,13 +249,13 @@ if __name__ == '__main__':
     today = dt.strftime("%Y-%m-%d")
 
     dir_path = args.directory
-    output_dir = os.path.join(dir_path, "output")
+    output_dir = os.path.join(dir_path, "FEP_workflow_pmx")
     path_target = os.path.join(output_dir, args.target + "_" + today) 
 
     t_structures = os.path.join(dir_path, args.target + ".sdf")
     t_edges = os.path.join(dir_path, args.target + "_ddG.csv")
     t_ligands = os.path.join(dir_path, args.target + "_dG.csv")
-    t_summary = os.path.join(dir_path, args.target + "_summary.csv")
 
     convert_schrod(args.target, args.directory, args.flag2)
     main(args.target, args.directory, args.flag1, args.properties_target, args.properties_ligands)
+    ligand_files_setup(args.target, args.directory, args.flag3)
