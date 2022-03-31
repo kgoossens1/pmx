@@ -79,9 +79,10 @@ def main(target_name, directory, flag1, *props):
     if not flag1:
         return
     print("main function invoked.\n")
-    print(f"Creating directories in {dir_path}.")
+    print(f"Creating directories in '{dir_path}'.")
     for directory in ["00_data", "01_protein", "02_ligands", "03_hybrid"]:
-        os.makedirs(os.path.join(path_target,directory), exist_ok=True)
+        os.makedirs(os.path.join(path_target, directory), exist_ok=True)
+    os.makedirs(os.path.join(path_target, "01_protein/crd"), exist_ok=True)
 
     """Append target to targets.yml"""
 
@@ -93,13 +94,13 @@ def main(target_name, directory, flag1, *props):
         print("NOTE: targets.yml did not exist yet. New file created.")
         with open(tgts_yml_path, 'w') as file:
             pass        
-            
-    with open(os.path.join(output_dir, "targets.yml"), "r+") as file: 
-        for line in file:
-            if target_name + ":" in line:
-                print(f"{target_name} already exists in the dataset. No new instance was created.")
-            else:
-                file.write(yaml.dump(target_dict)) #prints date with quotation marks
+    with open(tgts_yml_path, "r+") as file:
+        check = file.read()
+        if target_name + ":" in check:
+            print(f"{target_name} already exists in the dataset. No new instance was created.")
+        else:
+            print("writing...")
+            file.write(yaml.dump(target_dict)) #prints date with quotation marks
 
     """Edges.yml"""
 
